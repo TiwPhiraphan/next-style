@@ -16,12 +16,12 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.mjs",
+			"import": "./dist/index.js",
 			"require": "./dist/index.cjs"
 		},
 		"./plugin": {
 			"types": "./dist/postcss-plugin/index.d.ts",
-			"import": "./dist/postcss-plugin/index.mjs",
+			"import": "./dist/postcss-plugin/index.js",
 			"require": "./dist/postcss-plugin/index.cjs"
 		}
 	},
