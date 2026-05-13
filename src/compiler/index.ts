@@ -94,11 +94,9 @@ export class StyleCollector {
 			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
 			if (compiledMedia[normalized]) {
 				const existing = compiledMedia[normalized]
-				const existingDeclarations = existing
-					.split('\n')
-					.slice(2, -2)
-					.join('\n')
-				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${existingDeclarations}\n${inner}  }\n}`
+				const existingDeclarations = existing.split('\n').slice(2, -2).join('\n')
+				compiledMedia[normalized] =
+					`${normalized} {\n  .${className} {\n${existingDeclarations}\n${inner}  }\n}`
 			} else {
 				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${inner}  }\n}`
 			}
