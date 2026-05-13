@@ -1,0 +1,11 @@
+.github
+.vscode
+
+node_modules
+src
+
+AGENTS.md
+biome.json
+tsconfig.json
+tsup.config.ts
+.gitignore

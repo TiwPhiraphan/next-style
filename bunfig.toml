@@ -1,6 +1,0 @@
-[build]
-root = "src"
-outdir = "dist"
-
-[install]
-peer = true
