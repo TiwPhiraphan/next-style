@@ -232,6 +232,23 @@ export class StyleCollector {
 	}
 
 	/**
+	 * Writes all collected styles to a temp file so the PostCSS plugin
+	 * (which runs in a separate process) can read them.
+	 *
+	 * Call this after all `css()` / `global()` calls have been evaluated,
+	 * e.g. at the end of a build-time entry point.
+	 *
+	 * @param filePath - Destination file path. Defaults to `os.tmpdir()/next-style.css`.
+	 */
+	flush(filePath?: string): void {
+		const fs = require('node:fs') as typeof import('node:fs')
+		const os = require('node:os') as typeof import('node:os')
+		const path = require('node:path') as typeof import('node:path')
+		const dest = filePath ?? path.join(os.tmpdir(), 'next-style.css')
+		fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
+	}
+
+	/**
 	 * Returns a snapshot of the internal style map.
 	 * Intended for inspection and testing — not for direct mutation.
 	 */

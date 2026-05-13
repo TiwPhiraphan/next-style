@@ -75,7 +75,9 @@ export type CSSObject = CSSProperties &
  * }
  */
 export function css(styles: CSSObject): string {
-	return collector.addStyle(styles)
+	const className = collector.addStyle(styles)
+	collector.flush()
+	return className
 }
 
 /**
@@ -97,6 +99,7 @@ export function global(styles: Record<string, CSSObject>): void {
 	Object.entries(styles).forEach(([selector, styleObj]) => {
 		collector.addGlobalStyle(selector, styleObj)
 	})
+	collector.flush()
 }
 
 /**

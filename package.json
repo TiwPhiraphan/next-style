@@ -1,6 +1,6 @@
 {
 	"name": "next-style",
-	"version": "2.0.0",
+	"version": "2.0.1",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -41,11 +41,10 @@
 		"@types/bun": "^1.3.14",
 		"@types/node": "^25.7.0",
 		"csstype": "^3.2.3",
-		"postcss": "^8.5.14",
 		"typescript": "^5"
 	},
 	"peerDependencies": {
-		"postcss": "^8.4.31"
+		"postcss": ">=8.4.31"
 	},
 	"keywords": ["css-in-js", "zero-runtime", "next.js", "turbopack", "postcss", "style", "next-style", "css"],
 	"author": "TiwPhiraphan",

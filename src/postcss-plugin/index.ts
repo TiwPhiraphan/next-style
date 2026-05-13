@@ -1,69 +1,69 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import postcss from 'postcss'
-import type { StyleCollector } from '../compiler'
-
-const IMPORT_RE = /^next-style$/
 
 /**
  * PostCSS plugin for next-style.
  *
- * Replaces `@import "next-style";` (or `@import 'next-style';`) in CSS files
- * with the compiled CSS collected by the StyleCollector.
+ * How it works with Turbopack:
+ * 1. `css()` / `global()` calls in component files write compiled CSS to a
+ *    temp file (`os.tmpdir()/next-style.css`) via `styleCollector.flush()`.
+ * 2. This plugin reads that temp file and replaces `@import "next-style"`
+ *    with its contents at PostCSS processing time.
  *
- * The collector is populated by the runtime `css()` / `global()` calls that
- * run during the build-time module evaluation (SWC / tsc transform pass).
- * At that point all `css({})` calls have been executed and their styles are
- * sitting in the collector — the PostCSS plugin just needs to drain it.
+ * Because PostCSS runs in a separate process from the module graph,
+ * in-memory collectors cannot be shared. The temp file is the IPC bridge.
  *
  * Usage in postcss.config.js:
- *   import nextStylePlugin from 'next-style/plugin'
- *   export default { plugins: { 'next-style/plugin': {} } }
+ *   export default { plugins: { "next-style/plugin": {} } }
  */
 
+const IMPORT_RE = /^next-style$/
+
+/** Path to the temp file used as IPC bridge between runtime and PostCSS. */
+export const CACHE_FILE = path.join(os.tmpdir(), 'next-style.css')
+
 interface PluginOptions {
-	/** Provide a custom collector (useful for testing / server integration). */
-	collector?: StyleCollector
+	/**
+	 * Override the cache file path.
+	 * Defaults to `os.tmpdir()/next-style.css`.
+	 */
+	cacheFile?: string
 }
 
 function nextStylePlugin(opts: PluginOptions = {}) {
-	// Lazy-import the runtime collector so the plugin works even when
-	// the runtime module hasn't been evaluated yet (returns empty string then).
-	let collector: StyleCollector | null = opts.collector ?? null
+	const cacheFile = opts.cacheFile ?? CACHE_FILE
 
 	const plugin: postcss.Plugin = {
 		postcssPlugin: 'next-style',
 
 		Once(root) {
-			// Resolve collector from runtime if not provided
-			if (!collector) {
-				try {
-					// Dynamic require so the plugin can be loaded before the
-					// runtime module is on disk (e.g. during type-check only builds).
-					// eslint-disable-next-line @typescript-eslint/no-var-requires
-					const runtime = require('../runtime')
-					collector = runtime.styleCollector as StyleCollector
-				} catch {
-					// Runtime not available — skip injection silently
-					return
-				}
+			// Read compiled CSS from the temp file written by the runtime
+			let cssContent = ''
+			try {
+				cssContent = fs.readFileSync(cacheFile, 'utf-8')
+			} catch {
+				// Cache file doesn't exist yet (first cold boot before any css() call)
+				// — leave the @import in place so PostCSS doesn't error, just remove it
 			}
 
-			const cssContent = collector.getAllStyles()
-			if (!cssContent.trim()) return
-
-			// Walk @import "next-style" / @import 'next-style' declarations
-			let injected = false
+			// Replace @import "next-style" with compiled CSS (or remove if empty)
+			let replaced = false
 			root.walkAtRules('import', atRule => {
 				const val = atRule.params.replace(/['"]/g, '').trim()
 				if (!IMPORT_RE.test(val)) return
-				const parsed = postcss.parse(cssContent)
-				atRule.replaceWith(parsed)
-				injected = true
+				if (cssContent.trim()) {
+					atRule.replaceWith(postcss.parse(cssContent))
+				} else {
+					atRule.remove()
+				}
+				replaced = true
 			})
 
-			// If there was no @import directive, prepend styles at the top
-			if (!injected) {
-				const parsed = postcss.parse(cssContent)
-				root.prepend(parsed)
+			// No @import directive — prepend at top if there's content
+			if (!replaced && cssContent.trim()) {
+				root.prepend(postcss.parse(cssContent))
 			}
 		}
 	}
