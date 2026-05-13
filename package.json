@@ -5,6 +5,14 @@
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/TiwPhiraphan/next-style.git"
+	},
+	"bugs": {
+		"url": "https://github.com/TiwPhiraphan/next-style/issues"
+	},
+	"homepage": "https://github.com/TiwPhiraphan/next-style#readme",
 	"exports": {
 		".": {
 			"import": "./dist/index.js",
@@ -14,6 +22,9 @@
 			"import": "./dist/postcss-plugin/index.js",
 			"types": "./dist/postcss-plugin/index.d.ts"
 		}
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"files": ["dist"],
 	"scripts": {
