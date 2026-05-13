@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
 /**
@@ -89,10 +92,16 @@ export class StyleCollector {
 		Object.entries(mediaQueries).forEach(([query, styles]) => {
 			const normalized = normalizeMediaQuery(query)
 			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
-			const existing = compiledMedia[normalized]
-			compiledMedia[normalized] = existing
-				? `${normalized} {\n  .${className} {\n${existing.split('\n').slice(2, -1).join('\n')}\n${inner}  }\n}`
-				: `${normalized} {\n  .${className} {\n${inner}  }\n}`
+			if (compiledMedia[normalized]) {
+				const existing = compiledMedia[normalized]
+				const existingDeclarations = existing
+					.split('\n')
+					.slice(2, -2)
+					.join('\n')
+				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${existingDeclarations}\n${inner}  }\n}`
+			} else {
+				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${inner}  }\n}`
+			}
 		})
 
 		Object.entries(container).forEach(([query, styles]) => {
@@ -162,7 +171,8 @@ export class StyleCollector {
 			} else if (key === '@keyframes' && typeof value === 'object') {
 				Object.assign(keyframes, value)
 			} else if (key.startsWith('@supports')) {
-				supports[key.slice('@supports '.length)] = value
+				const condition = key.slice(0, 9) === '@supports' ? key.slice(9).trim() : key
+				supports[condition] = value
 			} else if (key.startsWith('@container')) {
 				container[key] = value
 			} else if (key.startsWith('@layer')) {
@@ -241,11 +251,12 @@ export class StyleCollector {
 	 * @param filePath - Destination file path. Defaults to `os.tmpdir()/next-style.css`.
 	 */
 	flush(filePath?: string): void {
-		const fs = require('node:fs') as typeof import('node:fs')
-		const os = require('node:os') as typeof import('node:os')
-		const path = require('node:path') as typeof import('node:path')
-		const dest = filePath ?? path.join(os.tmpdir(), 'next-style.css')
-		fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
+		try {
+			const dest = filePath ?? path.join(os.tmpdir(), 'next-style.css')
+			fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
+		} catch (err) {
+			console.error('Failed to flush styles to cache file:', err)
+		}
 	}
 
 	/**
