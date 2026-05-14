@@ -1,116 +1,30 @@
-# Next Style
+<div align="center">
 
-> **Zero-Runtime CSS-in-JS** for Next.js with Turbopack support
+# next-style
 
-A lightweight CSS-in-JS library that extracts styles at build time, resulting in zero runtime overhead. Write styles in JavaScript with full TypeScript support while shipping only pure CSS.
+**Zero-runtime CSS-in-JS for Next.js**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Write styles in TypeScript. Ship pure CSS. Zero overhead.
 
-## Why next-style?
+[![npm version](https://img.shields.io/npm/v/next-style?color=7F77DD&labelColor=000)](https://www.npmjs.com/package/next-style)
+[![License: MIT](https://img.shields.io/badge/license-MIT-7F77DD?labelColor=000)](https://opensource.org/licenses/MIT)
+[![Turbopack](https://img.shields.io/badge/Turbopack-ready-7F77DD?labelColor=000)](https://turbo.build/pack)
 
-- **Zero Runtime** — All style extraction happens at build time. Ship pure CSS, not JavaScript.
-- **Turbopack Ready** — Optimized for Next.js 15+ and Turbopack without additional configuration.
-- **Type Safe** — Full TypeScript support powered by [csstype](https://github.com/frenic/csstype) for intelligent autocomplete on every CSS property and value.
-- **Automatic Deduplication** — Identical style objects always produce the same class name.
-- **Responsive First** — Built-in shorthand breakpoints (`@sm`, `@md`, `@lg`, `@xl`, `@2xl`), sorted mobile-first automatically.
-- **Developer Experience** — Simple API. Just `css({})` and go.
+</div>
 
-## Quick Start
+---
 
-### Installation
-
-```bash
-bun add next-style
-```
-
-### Setup
-
-#### 1. Configure PostCSS
-
-Create `postcss.config.js` in your project root:
-
-```js
-export default {
-  plugins: {
-    "next-style/plugin": {}
-  }
-}
-```
-
-If you already have `postcss.config.js` (e.g. with Tailwind), add next-style first:
-
-```js
-export default {
-  plugins: {
-    "next-style/plugin": {},
-    tailwindcss: {},
-    autoprefixer: {}
-  }
-}
-```
-
-> **Order matters** — next-style must come before other plugins.
-
-#### 2. Import styles in `globals.css`
-
-```css
-@import "next-style";
-/* your other imports/rules */
-```
-
-The PostCSS plugin replaces this `@import` with the compiled CSS at build time.
-
-#### 3. Use in components
+**next-style** extracts all styles at build time through a PostCSS plugin — no style injection, no hydration cost, no runtime. The compiled CSS lands in your `globals.css` exactly once.
 
 ```tsx
 import { css } from "next-style"
 
-const title = css({
-  fontSize: "32px",
-  fontWeight: 500,
-  "@md": { fontSize: "40px" },
-  ":hover": { color: "#7F77DD" }
-})
-
-export default function App() {
-  return <h1 className={title}>Hello World</h1>
-}
-```
-
-## Features
-
-| Feature | Status | Details |
-|---------|--------|---------|
-| Zero Runtime | ✅ | Styles extracted at build time |
-| Turbopack | ✅ | Native support for Next.js 15+ |
-| Type Safety | ✅ | Powered by csstype — full property + value autocomplete |
-| Responsive Breakpoints | ✅ | `@sm` `@md` `@lg` `@xl` `@2xl` |
-| Arbitrary Media Queries | ✅ | `'@media (min-width: 900px)'` |
-| Pseudo-classes | ✅ | `:hover` `:focus` `:active` `:disabled` `:focus-visible` … |
-| Pseudo-elements | ✅ | `::before` `::after` `::first-letter` … |
-| Keyframe Animations | ✅ | `'@keyframes name'` inline with the style object |
-| Container Queries | ✅ | `'@container sidebar (min-width: 300px)'` |
-| `@supports` | ✅ | `'@supports (display: grid)'` |
-| `@layer` | ✅ | `'@layer utilities'` |
-| CSS Variables | ✅ | `var(--token)` as values |
-| Deduplication | ✅ | Same object → same class, always |
-| Global Styles | ✅ | `global()` for resets and base rules |
-
-## API
-
-### `css(styles: CSSObject): string`
-
-Converts a style object into a unique, stable class name. Identical objects always return the same class (deduplication). Styles are collected at build time — zero cost at runtime.
-
-```tsx
 const button = css({
   padding: "8px 16px",
   borderRadius: "6px",
   backgroundColor: "#7F77DD",
-  color: "#fff",
-  cursor: "pointer",
   ":hover": { backgroundColor: "#534AB7" },
-  "@md": { padding: "10px 20px" }
+  "@md": { padding: "10px 20px" },
 })
 
 export function Button() {
@@ -118,160 +32,306 @@ export function Button() {
 }
 ```
 
-### `global(styles: Record<string, CSSObject>): void`
+## Features
 
-Registers global CSS rules applied directly to selectors — no scoped class. Useful for resets, base typography, and third-party element overrides.
+| | |
+|---|---|
+| ⚡ **Zero runtime** | All styles extracted at build time — 0 bytes of style JS shipped |
+| 🔷 **Turbopack ready** | Works out of the box with Next.js 15+ and Turbopack |
+| 🔒 **Fully typed** | Every CSS property and value typed via [csstype](https://github.com/frenic/csstype) |
+| 📱 **Responsive first** | Shorthand breakpoints (`@sm` → `@2xl`) sorted mobile-first automatically |
+| ♻️ **Deduplication** | Identical style objects always hash to the same class name |
+| 🌍 **Global styles** | `global()` for resets, base typography, and third-party overrides |
+| 🎞️ **Keyframes** | Declare `@keyframes` inline next to the style that uses them |
+| 📦 **Tiny** | ~2 KB minified + gzipped |
+
+Full support for pseudo-classes, pseudo-elements, media queries, container queries, `@supports`, `@layer`, and CSS variables.
+
+## Installation
+
+```bash
+# npm
+npm install next-style
+
+# pnpm
+pnpm add next-style
+
+# bun
+bun add next-style
+```
+
+## Setup
+
+### 1. Configure PostCSS
+
+Create `postcss.config.js` in your project root:
+
+```js
+// postcss.config.js
+export default {
+  plugins: {
+    "next-style/plugin": {},
+  },
+}
+```
+
+<details>
+<summary>Using with Autoprefixer</summary>
+
+Install autoprefixer and add it **after** next-style:
+
+```bash
+bun add -D autoprefixer
+```
+
+```js
+// postcss.config.js
+export default {
+  plugins: {
+    "next-style/plugin": {},
+    autoprefixer: {},
+  },
+}
+```
+
+> **Order matters** — `next-style/plugin` must be listed before other plugins.
+
+</details>
+
+### 2. Add the import to `globals.css`
+
+```css
+/* app/globals.css */
+@import "next-style";
+```
+
+The PostCSS plugin replaces this import with all compiled styles at build time. Add it before any other rules.
+
+### 3. Use in your components
 
 ```tsx
+// app/page.tsx
+import { css } from "next-style"
+
+const title = css({
+  fontSize: "32px",
+  fontWeight: 600,
+  "@md": { fontSize: "40px" },
+  ":hover": { color: "#7F77DD" },
+})
+
+export default function Page() {
+  return <h1 className={title}>Hello World</h1>
+}
+```
+
+That's it. No providers, no wrappers, no configuration beyond PostCSS.
+
+## API
+
+### `css(styles)`
+
+```ts
+function css(styles: CSSObject): string
+```
+
+Converts a style object into a stable, unique class name. Identical style objects always produce the same hash — duplicates are eliminated automatically. All processing happens at build time.
+
+```tsx
+const card = css({
+  // Base styles
+  display: "flex",
+  flexDirection: "column",
+  padding: "16px",
+  borderRadius: "8px",
+  backgroundColor: "var(--surface)",
+
+  // Pseudo-classes
+  ":hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
+  ":focus-visible": { outline: "2px solid #7F77DD", outlineOffset: "2px" },
+
+  // Responsive breakpoints
+  "@md": { flexDirection: "row", padding: "24px" },
+  "@lg": { padding: "32px" },
+
+  // Arbitrary media query
+  "@media (prefers-reduced-motion: reduce)": { transition: "none" },
+
+  // Container query
+  "@container sidebar (min-width: 300px)": { fontSize: "16px" },
+
+  // Inline keyframes
+  animationName: "fadeIn",
+  animationDuration: "0.3s",
+  "@keyframes fadeIn": {
+    from: { opacity: 0, transform: "translateY(4px)" },
+    to:   { opacity: 1, transform: "translateY(0)" },
+  },
+})
+```
+
+### `global(styles)`
+
+```ts
+function global(styles: Record<string, CSSObject>): void
+```
+
+Registers styles directly against selectors — no scoping, no class name. Use for CSS resets, base typography, and overriding third-party elements.
+
+```tsx
+// app/globals.ts  (imported once in your layout)
 import { global } from "next-style"
 
 global({
-  "*": { boxSizing: "border-box", margin: "0" },
-  "body": { fontFamily: "Inter, sans-serif", lineHeight: "1.6" },
-  "h1, h2, h3": { fontWeight: 500, lineHeight: "1.2" }
+  "*": {
+    boxSizing: "border-box",
+    margin: "0",
+    padding: "0",
+  },
+  "body": {
+    fontFamily: "system-ui, sans-serif",
+    lineHeight: "1.6",
+    color: "var(--text-primary)",
+  },
+  "h1, h2, h3, h4": {
+    fontWeight: 600,
+    lineHeight: "1.2",
+  },
 })
 ```
 
-## Examples
+## Responsive Design
 
-### Responsive design
-
-Breakpoints expand to standard `min-width` media queries and are sorted mobile-first automatically.
+Shorthand breakpoints expand to `min-width` media queries and are always emitted in mobile-first order, regardless of how you write them.
 
 | Shorthand | Expands to |
-|-----------|-----------|
-| `@sm` | `@media (min-width: 640px)` |
-| `@md` | `@media (min-width: 768px)` |
-| `@lg` | `@media (min-width: 1024px)` |
-| `@xl` | `@media (min-width: 1280px)` |
+|-----------|------------|
+| `@sm`  | `@media (min-width: 640px)`  |
+| `@md`  | `@media (min-width: 768px)`  |
+| `@lg`  | `@media (min-width: 1024px)` |
+| `@xl`  | `@media (min-width: 1280px)` |
 | `@2xl` | `@media (min-width: 1536px)` |
 
 ```tsx
-const container = css({
-  width: "100%",
-  padding: "16px",
-  "@md": { width: "768px", padding: "24px" },
-  "@lg": { width: "1024px", padding: "32px" }
+const layout = css({
+  display: "grid",
+  gridTemplateColumns: "1fr",                        // mobile: single column
+  "@md": { gridTemplateColumns: "1fr 2fr" },         // tablet: sidebar + content
+  "@lg": { gridTemplateColumns: "240px 1fr 200px" }, // desktop: full layout
 })
 ```
 
-Arbitrary media queries are also supported:
+For custom breakpoints, use an arbitrary media query string:
 
 ```tsx
-const sidebar = css({
+const widget = css({
   display: "none",
-  "@media (min-width: 900px)": { display: "block" }
-})
-```
-
-### Interactive states
-
-```tsx
-const link = css({
-  color: "#3b82f6",
-  textDecoration: "none",
-  transition: "color 0.2s",
-  ":hover": { color: "#1e40af" },
-  ":focus-visible": { outline: "2px solid #3b82f6", outlineOffset: "2px" },
-  ":active": { color: "#1e3a8a" }
-})
-```
-
-### Keyframe animations
-
-Declare `@keyframes` inline alongside the style that uses them:
-
-```tsx
-const spinner = css({
-  animationName: "spin",
-  animationDuration: "1s",
-  animationTimingFunction: "linear",
-  animationIterationCount: "infinite",
-  "@keyframes spin": {
-    to: { transform: "rotate(360deg)" }
-  }
-})
-```
-
-### Container queries
-
-```tsx
-const card = css({
-  fontSize: "14px",
-  "@container sidebar (min-width: 300px)": { fontSize: "16px" }
-})
-```
-
-### CSS variables
-
-```tsx
-const card = css({
-  backgroundColor: "var(--bg-primary)",
-  color: "var(--text-primary)",
-  padding: "var(--spacing-4)",
-  borderRadius: "var(--radius-lg)"
+  "@media (min-width: 900px)": { display: "block" },
 })
 ```
 
 ## TypeScript
 
-All CSS properties and values are fully typed via [csstype](https://github.com/frenic/csstype). Typos in property names are caught at compile time and your editor will autocomplete valid values.
+All CSS properties and values are typed via [csstype](https://github.com/frenic/csstype). Property typos fail at compile time. Values get IDE autocomplete.
 
 ```tsx
 import { css, type CSSObject } from "next-style"
 
-const myStyles: CSSObject = {
-  fontSize: "16px",       // ✅ typed
-  colour: "red",          // ❌ compile error — unknown property
-  "@md": { fontSize: "20px" },
-  ":hover": { opacity: 0.8 }
+// Type a reusable style object before passing it to css()
+const base: CSSObject = {
+  fontSize: "16px",   // ✅
+  colour: "red",      // ❌ TypeScript error: unknown property
+  display: "flx",     // ❌ TypeScript error: invalid value
 }
 
-const title = css(myStyles)
+const el = css(base)
 ```
 
-### Exported types
+**Exported types:**
 
 | Type | Description |
 |------|-------------|
-| `CSSObject` | Style object accepted by `css()` and `global()` |
-| `CSSProperties` | CSS properties only (no at-rules or pseudos) — backed by csstype |
+| `CSSObject` | Full style object — properties, at-rules, and pseudos |
+| `CSSProperties` | CSS properties only, no at-rules or pseudos |
 
-## Advanced: `createTransformer`
+## Advanced
 
-For SWC/Babel transforms and test harnesses that need an isolated collector independent of the shared runtime instance:
+### `createTransformer`
+
+For build tooling, SWC/Babel plugins, and test harnesses that need an isolated style collector independent of the global runtime:
 
 ```ts
 import { createTransformer } from "next-style"
 
 const { collector, transformCssCall } = createTransformer()
-const className = transformCssCall({ color: "red" }) // "ns-abc123"
-const css = collector.getAllStyles()                   // ".ns-abc123 { color: red; }"
+
+const className = transformCssCall({ color: "red", fontSize: "16px" })
+// → "ns-abc123"
+
+const css = collector.getAllStyles()
+// → ".ns-abc123 { color: red; font-size: 16px; }"
 ```
 
-## Development
+### CSS Variables
+
+next-style pairs naturally with CSS custom properties for design tokens:
+
+```tsx
+// Define tokens once in global()
+global({
+  ":root": {
+    "--color-brand":   "#7F77DD",
+    "--color-surface": "#ffffff",
+    "--radius-base":   "6px",
+    "--spacing-4":     "16px",
+  },
+})
+
+// Consume anywhere in css()
+const card = css({
+  backgroundColor: "var(--color-surface)",
+  borderRadius:    "var(--radius-base)",
+  padding:         "var(--spacing-4)",
+  ":hover": { color: "var(--color-brand)" },
+})
+```
+
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| Runtime JS | **0 bytes** |
+| Bundle size | ~2 KB minified + gzipped |
+| Build overhead | Negligible — hashing + string emit only |
+| CSS deduplication | Automatic — one class per unique style object |
+
+Because styles are extracted at build time, there is no style recalculation, no `<style>` injection, and no FOUC. The output is a single static CSS file.
+
+## Troubleshooting
+
+**Styles not appearing**
+
+1. Check that `postcss.config.js` includes `"next-style/plugin": {}`
+2. Check that `@import "next-style";` is at the top of `globals.css`
+3. Restart the dev server after any PostCSS config change
+4. Clear the Next.js cache: `rm -rf .next` and restart
+
+**Build errors after adding PostCSS plugins**
+
+Ensure next-style is listed **first** in the plugins object — it must run before any other transformations.
+
+## Contributing
 
 ```bash
-# Install dependencies
-bun install
-
-# Build
-bun run build
-
-# Watch for changes
-bun run dev
-
-# Type-check only
-bunx tsc --noEmit
-
-# Lint
-bun run lint
-
-# Format
-bun run format
+bun install       # install dependencies
+bun run build     # production build
+bun run dev       # watch mode
+bun run lint      # lint
+bun run format    # format
+bunx tsc --noEmit # type-check only
 ```
 
-### Project structure
+**Project structure**
 
 ```
 src/
@@ -281,43 +341,6 @@ src/
 └── utils/            # camelToKebab · generateClassHash · BREAKPOINTS
 ```
 
-## Performance
-
-- **Bundle size** — ~2 KB minified + gzipped
-- **Runtime cost** — 0 bytes (styles extracted at build time)
-- **Build overhead** — negligible
-
-## Browser support
-
-All modern browsers (Chrome, Firefox, Safari, Edge).
-
-## Troubleshooting
-
-### Styles not appearing
-
-1. Confirm `postcss.config.js` includes `"next-style/plugin": {}`
-2. Confirm `@import "next-style";` is present in `globals.css`
-3. Restart the dev server — PostCSS config changes require a restart
-4. Clear the Next.js cache: `rm -rf .next` then restart
-
-### Using alongside Tailwind / Autoprefixer
-
-next-style must be listed **first** in the plugins object:
-
-```js
-export default {
-  plugins: {
-    "next-style/plugin": {},   // ← first
-    tailwindcss: {},
-    autoprefixer: {}
-  }
-}
-```
-
 ## License
 
 MIT © [TiwPhiraphan](https://github.com/TiwPhiraphan)
-
----
-
-**Made with ❤️ for Next.js developers**
