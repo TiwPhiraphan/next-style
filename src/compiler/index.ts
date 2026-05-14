@@ -1,5 +1,4 @@
 import fs from 'node:fs'
-import os from 'node:os'
 import path from 'node:path'
 import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
@@ -250,7 +249,8 @@ export class StyleCollector {
 	 */
 	flush(filePath?: string): void {
 		try {
-			const dest = filePath ?? path.join(os.tmpdir(), 'next-style.css')
+			const dest = filePath ?? path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')
+			fs.mkdirSync(path.dirname(dest), { recursive: true })
 			fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
 		} catch (err) {
 			console.error('Failed to flush styles to cache file:', err)
