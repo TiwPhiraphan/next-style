@@ -37,17 +37,22 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 	const plugin: postcss.Plugin = {
 		postcssPlugin: 'next-style',
 
-		Once(root) {
-			// Read compiled CSS from the temp file written by the runtime
+		Once(root, { result }) {
+			result.messages.push({
+				type: 'dependency',
+				plugin: 'next-style',
+				file: cacheFile,
+				parent: result.opts.from ?? '',
+			})
 			let cssContent = ''
 			try {
 				cssContent = fs.readFileSync(cacheFile, 'utf-8')
-			} catch {
-				// Cache file doesn't exist yet (first cold boot before any css() call)
-				// — leave the @import in place so PostCSS doesn't error, just remove it
+			} catch (err) {
+				const isNotFound = (err as NodeJS.ErrnoException).code === 'ENOENT'
+				if (!isNotFound) {
+					console.warn('[next-style] Failed to read cache file:', err)
+				}
 			}
-
-			// Replace @import "next-style" with compiled CSS (or remove if empty)
 			let replaced = false
 			root.walkAtRules('import', atRule => {
 				const val = atRule.params.replace(/['"]/g, '').trim()
@@ -59,14 +64,11 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				}
 				replaced = true
 			})
-
-			// No @import directive — prepend at top if there's content
 			if (!replaced && cssContent.trim()) {
 				root.prepend(postcss.parse(cssContent))
 			}
 		}
 	}
-
 	return plugin
 }
 
