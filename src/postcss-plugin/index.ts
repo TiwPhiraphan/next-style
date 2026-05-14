@@ -1,4 +1,5 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import postcss from 'postcss'
 
@@ -21,12 +22,12 @@ import postcss from 'postcss'
 const IMPORT_RE = /^next-style$/
 
 /** Path to the temp file used as IPC bridge between runtime and PostCSS. */
-export const CACHE_FILE = path.join(process.cwd(), 'node_modules/.cache/next-style.css')
+export const CACHE_FILE = path.join(os.tmpdir(), 'next-style.css')
 
 interface PluginOptions {
 	/**
 	 * Override the cache file path.
-	 * Defaults to `process.cwd()/node_modules/.cache/next-style.css`.
+	 * Defaults to `os.tmpdir()/next-style.css`.
 	 */
 	cacheFile?: string
 }
