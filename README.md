@@ -1,6 +1,6 @@
 <div align="center">
 
-# next-style
+# Next Style
 
 **Zero-runtime CSS-in-JS for Next.js**
 
@@ -60,6 +60,8 @@ pnpm add next-style
 bun add next-style
 ```
 
+> **Peer dependency:** `postcss >= 8.0.0` is required. Most Next.js projects already include it.
+
 ## Setup
 
 ### 1. Configure PostCSS
@@ -81,7 +83,7 @@ export default {
 Install autoprefixer and add it **after** next-style:
 
 ```bash
-bun add -D autoprefixer
+npm install -D autoprefixer
 ```
 
 ```js
@@ -146,9 +148,10 @@ const card = css({
   borderRadius: "8px",
   backgroundColor: "var(--surface)",
 
-  // Pseudo-classes
+  // Pseudo-classes & pseudo-elements
   ":hover": { boxShadow: "0 4px 12px rgba(0,0,0,0.1)" },
   ":focus-visible": { outline: "2px solid #7F77DD", outlineOffset: "2px" },
+  "::before": { content: '""', display: "block" },
 
   // Responsive breakpoints
   "@md": { flexDirection: "row", padding: "24px" },
@@ -159,6 +162,12 @@ const card = css({
 
   // Container query
   "@container sidebar (min-width: 300px)": { fontSize: "16px" },
+
+  // Feature query
+  "@supports (display: grid)": { display: "grid" },
+
+  // Cascade layer
+  "@layer utilities": { isolation: "isolate" },
 
   // Inline keyframes
   animationName: "fadeIn",
@@ -272,6 +281,29 @@ const css = collector.getAllStyles()
 // → ".ns-abc123 { color: red; font-size: 16px; }"
 ```
 
+### `StyleCollector`
+
+The class powering both the runtime and `createTransformer`. Exposed for custom integrations:
+
+```ts
+import { StyleCollector } from "next-style"
+
+const collector = new StyleCollector()
+collector.addStyle({ color: "red" })          // → "ns-abc123"
+collector.addGlobalStyle("body", { margin: "0" })
+collector.getAllStyles()                       // full CSS string
+collector.flush("/custom/path/styles.css")    // write to disk
+```
+
+### How the PostCSS bridge works
+
+Because PostCSS runs in a separate process from the module graph, in-memory style collectors cannot be shared. next-style solves this with a file-based bridge:
+
+1. Every `css()` / `global()` call writes compiled CSS to `node_modules/.cache/next-style.css`
+2. The PostCSS plugin reads that file and replaces `@import "next-style"` with its contents
+
+This is why `@import "next-style"` must appear in `globals.css` — it's the injection point.
+
 ### CSS Variables
 
 next-style pairs naturally with CSS custom properties for design tokens:
@@ -296,6 +328,17 @@ const card = css({
 })
 ```
 
+## CSS output order
+
+Styles are emitted in this order to ensure correct cascade:
+
+1. `@keyframes` blocks
+2. Base class rules
+3. Pseudo-class / pseudo-element rules
+4. `@layer` blocks
+5. `@supports` blocks
+6. Media queries (ascending `min-width`, mobile-first)
+
 ## Performance
 
 | Metric | Value |
@@ -316,6 +359,10 @@ Because styles are extracted at build time, there is no style recalculation, no 
 3. Restart the dev server after any PostCSS config change
 4. Clear the Next.js cache: `rm -rf .next` and restart
 
+**First cold boot shows no styles**
+
+On the very first build, no `css()` calls have been evaluated yet so the cache file doesn't exist. Run the dev server once to populate the cache, then styles will appear on reload. This is expected behaviour on cold starts.
+
 **Build errors after adding PostCSS plugins**
 
 Ensure next-style is listed **first** in the plugins object — it must run before any other transformations.
@@ -323,22 +370,24 @@ Ensure next-style is listed **first** in the plugins object — it must run befo
 ## Contributing
 
 ```bash
-bun install       # install dependencies
-bun run build     # production build
-bun run dev       # watch mode
-bun run lint      # lint
-bun run format    # format
-bunx tsc --noEmit # type-check only
+bun install        # install dependencies
+bun run export     # production build  (note: script is "export", not "build")
+bun run dev        # watch mode
+bun test           # run tests
+bun run lint       # lint with Biome
+bun run format     # format with Biome
+bunx tsc --noEmit  # type-check only
 ```
 
 **Project structure**
 
 ```
 src/
-├── runtime/          # css() · global() · CSSObject type
-├── postcss-plugin/   # @import "next-style" → compiled CSS
-├── compiler/         # StyleCollector · createTransformer
-└── utils/            # camelToKebab · generateClassHash · BREAKPOINTS
+├── index.ts              # public exports
+├── runtime/              # css() · global() · CSSObject type
+├── postcss-plugin/       # @import "next-style" → compiled CSS
+├── compiler/             # StyleCollector · createTransformer · CompiledStyle
+└── utils/                # camelToKebab · generateClassHash · BREAKPOINTS · normalizeMediaQuery
 ```
 
 ## License
