@@ -249,12 +249,21 @@ export class StyleCollector {
 	 */
 	flush(filePath?: string): void {
 		try {
-			const dest = filePath ?? path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')
+			const dest = filePath ?? StyleCollector.defaultCacheFile()
 			fs.mkdirSync(path.dirname(dest), { recursive: true })
 			fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
 		} catch (err) {
 			console.error('Failed to flush styles to cache file:', err)
 		}
+	}
+
+	/**
+	 * Returns the default cache file path, resolved at call-time from
+	 * `process.cwd()` so it reflects the actual working directory of the
+	 * running process rather than the directory at module-load time.
+	 */
+	static defaultCacheFile(): string {
+		return path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')
 	}
 
 	/**

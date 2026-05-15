@@ -20,24 +20,46 @@ import postcss from 'postcss'
 
 const IMPORT_RE = /^next-style$/
 
-/** Path to the temp file used as IPC bridge between runtime and PostCSS. */
-export const CACHE_FILE = path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')
+/**
+ * Walks up the directory tree from `fromFile` until it finds a directory
+ * containing `package.json`. Returns that directory, or `null` if none is
+ * found before reaching the filesystem root.
+ */
+function findProjectRoot(fromFile: string): string | null {
+	let dir = path.dirname(fromFile)
+	while (true) {
+		if (fs.existsSync(path.join(dir, 'package.json'))) return dir
+		const parent = path.dirname(dir)
+		if (parent === dir) return null
+		dir = parent
+	}
+}
+
+/**
+ * Resolves the cache file path from the PostCSS `result.opts.from` field.
+ * Falls back to `process.cwd()` when `from` is absent (e.g. standalone runs).
+ */
+export function resolveCacheFile(from: string | undefined): string {
+	const projectRoot = (from ? findProjectRoot(from) : null) ?? process.cwd()
+	return path.join(projectRoot, 'node_modules', '.cache', 'next-style', 'styles.css')
+}
 
 interface PluginOptions {
 	/**
 	 * Override the cache file path.
-	 * Defaults to `process.cwd()/node_modules/.cache/next-style/styles.css`.
+	 * When omitted, the path is derived from the CSS file being processed
+	 * (`result.opts.from`) by walking up to the nearest `package.json`.
 	 */
 	cacheFile?: string
 }
 
 function nextStylePlugin(opts: PluginOptions = {}) {
-	const cacheFile = opts.cacheFile ?? CACHE_FILE
-
 	const plugin: postcss.Plugin = {
 		postcssPlugin: 'next-style',
 
 		Once(root, { result }) {
+			const cacheFile = opts.cacheFile ?? resolveCacheFile(result.opts.from)
+
 			result.messages.push({
 				type: 'dependency',
 				plugin: 'next-style',
