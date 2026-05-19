@@ -367,29 +367,6 @@ On the very first build, no `css()` calls have been evaluated yet so the cache f
 
 Ensure next-style is listed **first** in the plugins object — it must run before any other transformations.
 
-## Contributing
-
-```bash
-bun install        # install dependencies
-bun run export     # production build  (note: script is "export", not "build")
-bun run dev        # watch mode
-bun test           # run tests
-bun run lint       # lint with Biome
-bun run format     # format with Biome
-bunx tsc --noEmit  # type-check only
-```
-
-**Project structure**
-
-```
-src/
-├── index.ts              # public exports
-├── runtime/              # css() · global() · CSSObject type
-├── postcss-plugin/       # @import "next-style" → compiled CSS
-├── compiler/             # StyleCollector · createTransformer · CompiledStyle
-└── utils/                # camelToKebab · generateClassHash · BREAKPOINTS · normalizeMediaQuery
-```
-
 ## License
 
-MIT © [TiwPhiraphan](https://github.com/TiwPhiraphan)
+MIT © [Tiwz](https://github.com/TiwPhiraphan)

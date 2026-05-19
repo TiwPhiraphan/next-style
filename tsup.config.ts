@@ -6,11 +6,11 @@ export default defineConfig({
 		'postcss-plugin/index': 'src/postcss-plugin/index.ts'
 	},
 	external: ['csstype'],
-	format: ['esm', 'cjs'],
-	splitting: false,
 	sourcemap: false,
-	minify: true,
+	splitting: false,
+	format: 'esm',
 	bundle: true,
+	minify: true,
 	clean: true,
 	shims: true,
 	dts: true

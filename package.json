@@ -49,6 +49,7 @@
 		"csstype": "latest"
 	},
 	"peerDependencies": {
+		"next": ">=16.0.0",
 		"postcss": ">=8.0.0"
 	},
 	"keywords": [
