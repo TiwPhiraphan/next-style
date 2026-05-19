@@ -3,8 +3,6 @@
 	"version": "2.1.2",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
-	"main": "./dist/index.cjs",
-	"types": "./dist/index.d.ts",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/TiwPhiraphan/next-style.git"
@@ -16,13 +14,11 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
+			"import": "./dist/index.js"
 		},
 		"./plugin": {
 			"types": "./dist/postcss-plugin/index.d.ts",
-			"import": "./dist/postcss-plugin/index.js",
-			"require": "./dist/postcss-plugin/index.cjs"
+			"import": "./dist/postcss-plugin/index.js"
 		}
 	},
 	"publishConfig": {
