@@ -77,22 +77,32 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				}
 			}
 			if (process.env.NODE_ENV === 'production' && cssContent.trim()) {
-                try {
-                    const minifyResult = await postcss([
-                        cssnano({
-							preset: ['default', {
-								mergeLonghand: true,
-								reduceTransforms: true,
-								normalizeWhitespace: true,
-								discardComments: { removeAll: true }
-							}]
+				try {
+					const minifyResult = await postcss([
+						cssnano({
+							preset: [
+								'default',
+								{
+									discardComments: { removeAll: true },
+									normalizeWhitespace: true,
+									mergeLonghand: true,
+									reduceTransforms: true,
+									convertValues: true,
+									zindex: false,
+									svgo: false,
+									autoprefixer: false,
+									mergeRules: true,
+									discardDuplicates: true,
+									reduceInitial: true
+								}
+							]
 						})
-                    ]).process(cssContent, { from: undefined })
-                    cssContent = minifyResult.css
-                } catch (e) {
-                    console.warn('[next-style] CSS minification failed:', e)
-                }
-            }
+					]).process(cssContent, { from: undefined })
+					cssContent = minifyResult.css
+				} catch (e) {
+					console.warn('[next-style] CSS minification failed:', e)
+				}
+			}
 			let replaced = false
 			root.walkAtRules('import', atRule => {
 				const val = atRule.params.replace(/['"]/g, '').trim()

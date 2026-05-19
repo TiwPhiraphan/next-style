@@ -51,7 +51,18 @@
 	"peerDependencies": {
 		"postcss": ">=8.0.0"
 	},
-	"keywords": ["css-in-js", "zero-runtime", "next.js", "nextjs", "typescript", "turbopack", "postcss", "style", "next-style", "css"],
+	"keywords": [
+		"css-in-js",
+		"zero-runtime",
+		"next.js",
+		"nextjs",
+		"typescript",
+		"turbopack",
+		"postcss",
+		"style",
+		"next-style",
+		"css"
+	],
 	"author": "TiwPhiraphan",
 	"license": "MIT"
 }
