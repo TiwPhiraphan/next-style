@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import cssnano from 'cssnano'
 import postcss from 'postcss'
 
 /**
@@ -57,14 +58,14 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 	const plugin: postcss.Plugin = {
 		postcssPlugin: 'next-style',
 
-		Once(root, { result }) {
+		async Once(root, { result }) {
 			const cacheFile = opts.cacheFile ?? resolveCacheFile(result.opts.from)
 
 			result.messages.push({
 				type: 'dependency',
 				plugin: 'next-style',
 				file: cacheFile,
-				parent: result.opts.from ?? '',
+				parent: result.opts.from ?? ''
 			})
 			let cssContent = ''
 			try {
@@ -75,6 +76,23 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 					console.warn('[next-style] Failed to read cache file:', err)
 				}
 			}
+			if (process.env.NODE_ENV === 'production' && cssContent.trim()) {
+                try {
+                    const minifyResult = await postcss([
+                        cssnano({
+							preset: ['default', {
+								mergeLonghand: true,
+								reduceTransforms: true,
+								normalizeWhitespace: true,
+								discardComments: { removeAll: true }
+							}]
+						})
+                    ]).process(cssContent, { from: undefined })
+                    cssContent = minifyResult.css
+                } catch (e) {
+                    console.warn('[next-style] CSS minification failed:', e)
+                }
+            }
 			let replaced = false
 			root.walkAtRules('import', atRule => {
 				const val = atRule.params.replace(/['"]/g, '').trim()

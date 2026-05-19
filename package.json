@@ -1,6 +1,6 @@
 {
 	"name": "next-style",
-	"version": "2.1.1",
+	"version": "2.1.2",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
 	"main": "./dist/index.cjs",
@@ -39,8 +39,9 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.15",
-		"@types/node": "^25.7.0",
 		"@types/bun": "^1.3.14",
+		"@types/node": "^25.7.0",
+		"cssnano": "^8.0.1",
 		"typescript": "^5",
 		"tsup": "^8.5.1"
 	},
