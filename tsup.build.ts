@@ -4,6 +4,7 @@ const options: Options = {
 	external: ['csstype'],
 	sourcemap: false,
 	splitting: false,
+	target: 'node20',
     outDir: 'dist',
 	bundle: true,
 	minify: true,
