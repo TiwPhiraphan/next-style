@@ -48,7 +48,7 @@
 	},
 	"peerDependencies": {
 		"next": ">=15",
-		"postcss": ">=7"
+		"postcss": ">=8"
 	},
 	"keywords": [
 		"css-in-js",
