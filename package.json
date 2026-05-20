@@ -1,6 +1,6 @@
 {
 	"name": "next-style",
-	"version": "2.1.4",
+	"version": "2.1.5",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
 	"repository": {
