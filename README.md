@@ -170,7 +170,7 @@ bun add next-style
 ```
 
 **Peer dependencies required:**
-- `next >= 16.0.0`
+- `next >= 15.0.0`
 - `postcss >= 8.0.0`
 
 > Most Next.js projects already include PostCSS. If you're unsure, check your `package.json` or run `npm list postcss`.
