@@ -1,6 +1,6 @@
 {
 	"name": "next-style",
-	"version": "2.1.2",
+	"version": "2.1.3",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
 	"repository": {
@@ -14,11 +14,13 @@
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
-			"import": "./dist/index.js"
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
 		},
 		"./plugin": {
 			"types": "./dist/postcss-plugin/index.d.ts",
-			"import": "./dist/postcss-plugin/index.js"
+			"import": "./dist/postcss-plugin/index.js",
+			"require": "./dist/postcss-plugin/index.cjs"
 		}
 	},
 	"publishConfig": {
@@ -26,7 +28,7 @@
 	},
 	"files": ["dist"],
 	"scripts": {
-		"export": "tsup",
+		"export": "bun tsup.build.ts",
 		"build:watch": "tsup --watch",
 		"dev": "tsup --watch",
 		"test": "bun test",
