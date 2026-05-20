@@ -4,4 +4,7 @@ dist/
 .DS_Store
 .env
 .env.local
+*.lock
 *.log
+*.zip
+*.7z

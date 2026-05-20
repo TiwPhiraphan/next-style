@@ -21,13 +21,12 @@ export function camelToKebab(str: string): string {
  */
 export function generateClassHash(styles: any): string {
 	const str = typeof styles === 'string' ? styles : JSON.stringify(styles)
-	let hash = 0
+	let hash = 2166136261
 	for (let i = 0; i < str.length; i++) {
-		const char = str.charCodeAt(i)
-		hash = (hash << 5) - hash + char
-		hash = hash & hash
+		hash ^= str.charCodeAt(i)
+		hash = (hash * 16777619) >>> 0
 	}
-	return Math.abs(hash).toString(36)
+	return hash.toString(36)
 }
 
 /**

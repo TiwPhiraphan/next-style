@@ -1,5 +1,3 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
 /**
@@ -248,7 +246,10 @@ export class StyleCollector {
 	 * @param filePath - Destination file path. Defaults to `os.tmpdir()/next-style.css`.
 	 */
 	flush(filePath?: string): void {
+		if (typeof process === 'undefined' || process.versions?.node == null) return
 		try {
+			const fs = require('node:fs') as typeof import('node:fs')
+			const path = require('node:path') as typeof import('node:path')
 			const dest = filePath ?? StyleCollector.defaultCacheFile()
 			fs.mkdirSync(path.dirname(dest), { recursive: true })
 			fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
@@ -263,6 +264,7 @@ export class StyleCollector {
 	 * running process rather than the directory at module-load time.
 	 */
 	static defaultCacheFile(): string {
+		const path = require('node:path') as typeof import('node:path')
 		return path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')
 	}
 
