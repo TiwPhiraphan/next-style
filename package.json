@@ -1,0 +1,67 @@
+{
+	"name": "next-style",
+	"version": "2.1.5",
+	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
+	"type": "module",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/TiwPhiraphan/next-style.git"
+	},
+	"bugs": {
+		"url": "https://github.com/TiwPhiraphan/next-style/issues"
+	},
+	"homepage": "https://github.com/TiwPhiraphan/next-style#readme",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./plugin": {
+			"types": "./dist/postcss-plugin/index.d.ts",
+			"import": "./dist/postcss-plugin/index.js",
+			"require": "./dist/postcss-plugin/index.cjs"
+		}
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"files": ["dist"],
+	"scripts": {
+		"export": "bun tsup.build.ts",
+		"build:watch": "tsup --watch",
+		"dev": "tsup --watch",
+		"test": "bun test",
+		"lint": "biome lint",
+		"format": "biome format --write"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.15",
+		"@types/bun": "^1.3.14",
+		"@types/node": "^25.7.0",
+		"cssnano": "^8.0.1",
+		"typescript": "^5",
+		"tsup": "^8.5.1"
+	},
+	"dependencies": {
+		"csstype": "latest"
+	},
+	"peerDependencies": {
+		"next": ">=16.0.0",
+		"postcss": ">=8.0.0"
+	},
+	"keywords": [
+		"css-in-js",
+		"zero-runtime",
+		"next.js",
+		"nextjs",
+		"typescript",
+		"turbopack",
+		"postcss",
+		"style",
+		"next-style",
+		"css"
+	],
+	"author": "TiwPhiraphan",
+	"license": "MIT"
+}
