@@ -1,6 +1,6 @@
 {
 	"name": "next-style",
-	"version": "2.1.3",
+	"version": "2.1.4",
 	"description": "Zero-Runtime CSS-in-JS for Next.js + Turbopack",
 	"type": "module",
 	"repository": {
@@ -11,6 +11,7 @@
 		"url": "https://github.com/TiwPhiraphan/next-style/issues"
 	},
 	"homepage": "https://github.com/TiwPhiraphan/next-style#readme",
+	
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -22,6 +23,11 @@
 			"import": "./dist/postcss-plugin/index.js",
 			"require": "./dist/postcss-plugin/index.cjs"
 		}
+	},
+	"browser": {
+		"fs": false,
+		"path": false,
+		"os": false
 	},
 	"publishConfig": {
 		"access": "public"
