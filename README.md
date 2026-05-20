@@ -154,8 +154,7 @@ Full support for pseudo-classes, pseudo-elements, media queries, container queri
 |-----------------|-----------|
 | 16+ | ✅ Full support with Turbopack |
 | 15.x | ✅ Supported |
-| 14.x | ✅ Supported |
-| < 14.0 | ❌ Not supported |
+| < 15.0 | ❌ Not supported |
 
 ## Installation
 
