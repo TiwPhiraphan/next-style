@@ -659,7 +659,7 @@ export function ThemeToggle() {
 
 ### First cold boot shows no styles
 
-On the very first build, no `css()` calls have been evaluated yet so the cache file doesn't exist. Run the dev server once to populate the cache. Subsequent builds will include all styles. This is expected behavior on cold starts.
+On the very first build, no `css()` calls have been evaluated yet so the cache file doesn't exist. Starting from v2.2.4, cold builds work automatically — the PostCSS plugin scans your source files directly when the cache file is missing, so no prior dev run is required.
 
 **For production/CI builds:** The PostCSS plugin automatically scans your source files to extract styles if the cache file is missing, so cold builds on GitHub Actions, Vercel, or other CI systems work without extra setup.
 
