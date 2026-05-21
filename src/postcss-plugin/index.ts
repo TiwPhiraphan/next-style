@@ -70,39 +70,99 @@ function collectSourceFiles(dir: string): string[] {
  * Very small JS/TS object literal evaluator.
  * Handles string, number, nested object, and array literals only.
  * Returns `null` when the text cannot be safely evaluated.
+ *
+ * Strategy:
+ * 1. Try direct eval of the raw text (works for pure literal objects).
+ * 2. If that fails, strip TypeScript type assertions (`as Foo`, `satisfies Foo`)
+ *    and replace template literals / variable references with placeholder
+ *    strings, then try again. This handles the common pattern of
+ *    `css({ color: someVar })` — the property will be skipped at runtime
+ *    but the selector (and thus the class-name hash) will still be stable
+ *    for fully-literal properties.
  */
 function safeEvalObject(src: string): Record<string, any> | null {
+	// Attempt 1: raw eval
 	try {
-		// Allow only safe literal tokens — no identifiers that could be code.
 		const fn = new Function(`"use strict"; return (${src});`)
 		const result = fn()
 		if (result && typeof result === 'object' && !Array.isArray(result)) return result
-		return null
 	} catch {
-		return null
+		/* fall through */
 	}
+
+	// Attempt 2: sanitise common non-literal constructs and retry
+	try {
+		const sanitised = src
+			// Remove TypeScript type assertions: `as Foo`, `satisfies Bar`
+			.replace(/\s+(?:as|satisfies)\s+\w[\w.<>[\], |&]*/g, '')
+			// Replace template literals with a placeholder string
+			.replace(/`[^`]*`/g, '"__tmpl__"')
+			// Replace identifiers used as values (not as keys) with a placeholder.
+			// Pattern: after `:` or after `[`, an unquoted word that is not a
+			// reserved JSON keyword (true/false/null) nor a number.
+			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*)(?=\s*[,}])/g, (_m, id) => {
+				if (id === 'true' || id === 'false' || id === 'null' || id === 'undefined') return id
+				return '"__ref__"'
+			})
+		const fn2 = new Function(`"use strict"; return (${sanitised});`)
+		const result2 = fn2()
+		if (result2 && typeof result2 === 'object' && !Array.isArray(result2)) return result2
+	} catch {
+		/* fall through */
+	}
+
+	return null
 }
 
 /**
  * Extract the balanced object literal that starts at `startIdx` (the `{`)
  * inside `src`. Returns the raw text or `null` if unbalanced.
+ * Correctly skips over string literals (including template literals with
+ * nested `${...}` expressions) so that brace characters inside strings are
+ * not counted toward the depth.
  */
 function extractBalancedBraces(src: string, startIdx: number): string | null {
 	let depth = 0
 	let i = startIdx
 	let inStr: string | null = null
+	let tmplDepth = 0 // nesting depth of ${} inside template literals
 
 	while (i < src.length) {
 		const ch = src[i]
-		if (inStr) {
-			if (ch === '\\') { i += 2; continue }
+		if (inStr === '`') {
+			// Inside a template literal
+			if (ch === '\\') {
+				i += 2
+				continue
+			}
+			if (ch === '`') {
+				inStr = null
+			} else if (ch === '$' && src[i + 1] === '{') {
+				// Enter a template expression — treat its braces as normal code
+				tmplDepth++
+				i += 2
+				continue
+			}
+		} else if (inStr) {
+			// Inside a regular string
+			if (ch === '\\') {
+				i += 2
+				continue
+			}
 			if (ch === inStr) inStr = null
 		} else {
-			if (ch === '"' || ch === "'" || ch === '`') { inStr = ch }
-			else if (ch === '{') { depth++ }
-			else if (ch === '}') {
-				depth--
-				if (depth === 0) return src.slice(startIdx, i + 1)
+			if (ch === '"' || ch === "'" || ch === '`') {
+				inStr = ch
+			} else if (ch === '{') {
+				if (tmplDepth > 0) tmplDepth++
+				else depth++
+			} else if (ch === '}') {
+				if (tmplDepth > 0) {
+					tmplDepth--
+				} else {
+					depth--
+					if (depth === 0) return src.slice(startIdx, i + 1)
+				}
 			}
 		}
 		i++
@@ -158,9 +218,7 @@ function normaliseCSSObject(obj: Record<string, any>): Record<string, any> {
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
 		const key = BREAKPOINTS[k] ?? k
-		out[key] = v && typeof v === 'object' && !Array.isArray(v)
-			? normaliseCSSObject(v)
-			: v
+		out[key] = v && typeof v === 'object' && !Array.isArray(v) ? normaliseCSSObject(v) : v
 	}
 	return out
 }
@@ -174,7 +232,11 @@ function scanProjectStyles(projectRoot: string): string {
 	const files = collectSourceFiles(projectRoot)
 	for (const file of files) {
 		let src: string
-		try { src = fs.readFileSync(file, 'utf-8') } catch { continue }
+		try {
+			src = fs.readFileSync(file, 'utf-8')
+		} catch {
+			continue
+		}
 		scanFile(src, collector)
 	}
 	return collector.getAllStyles()

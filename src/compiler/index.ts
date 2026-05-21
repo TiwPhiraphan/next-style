@@ -3,6 +3,21 @@ import path from 'node:path'
 import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
 /**
+ * Recursively replaces shorthand breakpoint keys (e.g. `'@sm'`) with their
+ * full `@media` equivalents before hashing, so that the hash produced here
+ * matches the one produced by the PostCSS static scanner (which also
+ * normalises keys via `normaliseCSSObject` before calling `addStyle`).
+ */
+function normaliseStyleKeys(obj: Record<string, any>): Record<string, any> {
+	const out: Record<string, any> = {}
+	for (const [k, v] of Object.entries(obj)) {
+		const key = BREAKPOINTS[k] ?? k
+		out[key] = v && typeof v === 'object' && !Array.isArray(v) ? normaliseStyleKeys(v) : v
+	}
+	return out
+}
+
+/**
  * The compiled representation of a single `css({})` call.
  * Produced by `StyleCollector` and consumed by the PostCSS plugin.
  */
@@ -45,12 +60,13 @@ export class StyleCollector {
 	 * @returns Scoped class name string.
 	 */
 	addStyle(styleObj: any): string {
-		const hash = generateClassHash(styleObj)
+		const normalised = normaliseStyleKeys(styleObj)
+		const hash = generateClassHash(normalised)
 		const className = `ns-${hash}`
 		if (this.styles.has(className)) {
 			return className
 		}
-		const compiled = this.compileStyle(styleObj)
+		const compiled = this.compileStyle(normalised)
 		this.styles.set(className, compiled)
 		return className
 	}
@@ -81,7 +97,7 @@ export class StyleCollector {
 	private compileStyle(styleObj: any): CompiledStyle {
 		const { mediaQueries, pseudoClasses, normalStyles, keyframes, supports, container, layer } =
 			this.parseStyles(styleObj)
-		const hash = generateClassHash(styleObj)
+		const hash = generateClassHash(styleObj) // styleObj is already normalised here
 		const className = `ns-${hash}`
 
 		const declarations = this.buildDeclarations(normalStyles)
