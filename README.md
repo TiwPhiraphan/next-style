@@ -650,10 +650,10 @@ export function ThemeToggle() {
 1. ✅ Check that `postcss.config.js` includes `"next-style/plugin": {}`
 2. ✅ Check that `@import "next-style";` is at the **top** of `globals.css` (before other styles)
 3. ✅ Verify you imported `css` from the correct package:
-   ```tsx
-   import { css } from "next-style"  // ✓ correct
-   import { css } from "next-style/plugin"  // ✗ incorrect
-   ```
+```tsx
+import { css } from "next-style"  // ✓ correct
+import { css } from "next-style/plugin"  // ✗ incorrect
+```
 4. ✅ Restart the dev server after any PostCSS config change
 5. ✅ Clear the Next.js cache: `rm -rf .next` and restart
 
