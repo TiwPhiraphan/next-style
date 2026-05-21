@@ -86,9 +86,7 @@ function safeEvalObject(src: string): Record<string, any> | null {
 		const fn = new Function(`"use strict"; return (${src});`)
 		const result = fn()
 		if (result && typeof result === 'object' && !Array.isArray(result)) return result
-	} catch {
-		/* fall through */
-	}
+	} catch { /* fall through */ }
 
 	// Attempt 2: sanitise common non-literal constructs and retry
 	try {
@@ -107,9 +105,7 @@ function safeEvalObject(src: string): Record<string, any> | null {
 		const fn2 = new Function(`"use strict"; return (${sanitised});`)
 		const result2 = fn2()
 		if (result2 && typeof result2 === 'object' && !Array.isArray(result2)) return result2
-	} catch {
-		/* fall through */
-	}
+	} catch { /* fall through */ }
 
 	return null
 }
@@ -125,19 +121,15 @@ function extractBalancedBraces(src: string, startIdx: number): string | null {
 	let depth = 0
 	let i = startIdx
 	let inStr: string | null = null
-	let tmplDepth = 0 // nesting depth of ${} inside template literals
+	let tmplDepth = 0  // nesting depth of ${} inside template literals
 
 	while (i < src.length) {
 		const ch = src[i]
 		if (inStr === '`') {
 			// Inside a template literal
-			if (ch === '\\') {
-				i += 2
-				continue
-			}
-			if (ch === '`') {
-				inStr = null
-			} else if (ch === '$' && src[i + 1] === '{') {
+			if (ch === '\\') { i += 2; continue }
+			if (ch === '`') { inStr = null }
+			else if (ch === '$' && src[i + 1] === '{') {
 				// Enter a template expression — treat its braces as normal code
 				tmplDepth++
 				i += 2
@@ -145,10 +137,7 @@ function extractBalancedBraces(src: string, startIdx: number): string | null {
 			}
 		} else if (inStr) {
 			// Inside a regular string
-			if (ch === '\\') {
-				i += 2
-				continue
-			}
+			if (ch === '\\') { i += 2; continue }
 			if (ch === inStr) inStr = null
 		} else {
 			if (ch === '"' || ch === "'" || ch === '`') {
@@ -218,7 +207,9 @@ function normaliseCSSObject(obj: Record<string, any>): Record<string, any> {
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
 		const key = BREAKPOINTS[k] ?? k
-		out[key] = v && typeof v === 'object' && !Array.isArray(v) ? normaliseCSSObject(v) : v
+		out[key] = v && typeof v === 'object' && !Array.isArray(v)
+			? normaliseCSSObject(v)
+			: v
 	}
 	return out
 }
@@ -232,11 +223,7 @@ function scanProjectStyles(projectRoot: string): string {
 	const files = collectSourceFiles(projectRoot)
 	for (const file of files) {
 		let src: string
-		try {
-			src = fs.readFileSync(file, 'utf-8')
-		} catch {
-			continue
-		}
+		try { src = fs.readFileSync(file, 'utf-8') } catch { continue }
 		scanFile(src, collector)
 	}
 	return collector.getAllStyles()
@@ -324,8 +311,11 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				}
 			}
 
-			// --- 4. Inject into CSS (replace @import "next-style" or prepend) ---
-			let replaced = false
+			// --- 4. Inject into CSS (replace @import "next-style" only) ---
+			// Do NOT fall back to prepend when no @import is found.
+			// Next.js/Turbopack runs PostCSS against every CSS chunk, so
+			// prepending would duplicate the entire stylesheet into every
+			// chunk that doesn't explicitly opt in via @import "next-style".
 			root.walkAtRules('import', atRule => {
 				const val = atRule.params.replace(/['"]/g, '').trim()
 				if (!IMPORT_RE.test(val)) return
@@ -334,11 +324,7 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				} else {
 					atRule.remove()
 				}
-				replaced = true
 			})
-			if (!replaced && cssContent.trim()) {
-				root.prepend(postcss.parse(cssContent))
-			}
 		}
 	}
 	return plugin
