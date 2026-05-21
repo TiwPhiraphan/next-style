@@ -2,12 +2,6 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
-/**
- * Recursively replaces shorthand breakpoint keys (e.g. `'@sm'`) with their
- * full `@media` equivalents before hashing, so that the hash produced here
- * matches the one produced by the PostCSS static scanner (which also
- * normalises keys via `normaliseCSSObject` before calling `addStyle`).
- */
 function normaliseStyleKeys(obj: Record<string, any>): Record<string, any> {
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
@@ -17,24 +11,13 @@ function normaliseStyleKeys(obj: Record<string, any>): Record<string, any> {
 	return out
 }
 
-/**
- * The compiled representation of a single `css({})` call.
- * Produced by `StyleCollector` and consumed by the PostCSS plugin.
- */
 export interface CompiledStyle {
-	/** Scoped class name, e.g. `"ns-1x2y3z"`. */
 	className: string
-	/** Base CSS rule block for this class. */
 	css: string
-	/** Map of normalized media query string → CSS rule block. */
 	mediaQueries: Record<string, string>
-	/** Map of pseudo selector (e.g. `":hover"`) → CSS rule block. */
 	pseudoClasses: Record<string, string>
-	/** Concatenated `@keyframes` blocks referenced by this style. */
 	keyframes: string
-	/** Map of `@supports` condition → CSS rule block. */
 	supports: Record<string, string>
-	/** Map of `@layer` name → CSS rule block. */
 	layers: Record<string, string>
 }
 
@@ -95,14 +78,11 @@ export class StyleCollector {
 	}
 
 	private compileStyle(styleObj: any): CompiledStyle {
-		const { mediaQueries, pseudoClasses, normalStyles, keyframes, supports, container, layer } =
-			this.parseStyles(styleObj)
-		const hash = generateClassHash(styleObj) // styleObj is already normalised here
+		const { mediaQueries, pseudoClasses, normalStyles, keyframes, supports, container, layer } = this.parseStyles(styleObj)
+		const hash = generateClassHash(styleObj)
 		const className = `ns-${hash}`
-
 		const declarations = this.buildDeclarations(normalStyles)
 		const css = `.${className} {\n${declarations}}`
-
 		const compiledMedia: Record<string, string> = {}
 		Object.entries(mediaQueries).forEach(([query, styles]) => {
 			const normalized = normalizeMediaQuery(query)
@@ -116,18 +96,15 @@ export class StyleCollector {
 				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${inner}  }\n}`
 			}
 		})
-
 		Object.entries(container).forEach(([query, styles]) => {
 			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
 			compiledMedia[query] = `${query} {\n  .${className} {\n${inner}  }\n}`
 		})
-
 		const compiledPseudos: Record<string, string> = {}
 		Object.entries(pseudoClasses).forEach(([pseudo, styles]) => {
 			const inner = this.buildDeclarations(styles as Record<string, any>)
 			compiledPseudos[pseudo] = `.${className}${pseudo} {\n${inner}}`
 		})
-
 		let keyframesCss = ''
 		Object.entries(keyframes).forEach(([name, frames]) => {
 			keyframesCss += `@keyframes ${name} {\n`
@@ -137,19 +114,16 @@ export class StyleCollector {
 			})
 			keyframesCss += '}\n'
 		})
-
 		const compiledSupports: Record<string, string> = {}
 		Object.entries(supports).forEach(([condition, styles]) => {
 			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
 			compiledSupports[condition] = `@supports ${condition} {\n  .${className} {\n${inner}  }\n}`
 		})
-
 		const compiledLayers: Record<string, string> = {}
 		Object.entries(layer).forEach(([name, styles]) => {
 			const inner = this.buildDeclarations(styles as Record<string, any>, '  ')
 			compiledLayers[name] = `@layer ${name} {\n${inner}}`
 		})
-
 		return {
 			className,
 			css,
@@ -177,7 +151,6 @@ export class StyleCollector {
 		const supports: Record<string, any> = {}
 		const container: Record<string, any> = {}
 		const layer: Record<string, any> = {}
-
 		Object.entries(styleObj).forEach(([key, value]) => {
 			if (key.startsWith('@keyframes ')) {
 				keyframes[key.slice('@keyframes '.length)] = value
@@ -198,7 +171,6 @@ export class StyleCollector {
 				normalStyles[key] = value
 			}
 		})
-
 		return { normalStyles, mediaQueries, pseudoClasses, keyframes, supports, container, layer }
 	}
 

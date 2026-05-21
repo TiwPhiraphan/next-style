@@ -63,6 +63,7 @@
 				"noImgElement": "off"
 			},
 			"suspicious": {
+				"noAssignInExpressions": "off",
 				"noUnknownAtRules": "off",
 				"noExplicitAny": "off"
 			}
