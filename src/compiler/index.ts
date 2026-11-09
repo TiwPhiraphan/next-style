@@ -1,8 +1,9 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { BREAKPOINTS, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
+import { BREAKPOINTS, addPxIfNeeded, camelToKebab, generateClassHash, normalizeMediaQuery } from '../utils'
 
 function normaliseStyleKeys(obj: Record<string, any>): Record<string, any> {
+	if (!obj || typeof obj !== 'object') return {}
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
 		const key = BREAKPOINTS[k] ?? k
@@ -43,87 +44,170 @@ export class StyleCollector {
 	 * @returns Scoped class name string.
 	 */
 	addStyle(styleObj: any): string {
+		if (!styleObj || typeof styleObj !== 'object') {
+			return 'ns-0'
+		}
 		const normalised = normaliseStyleKeys(styleObj)
 		const hash = generateClassHash(normalised)
 		const className = `ns-${hash}`
 		if (this.styles.has(className)) {
 			return className
 		}
-		const compiled = this.compileStyle(normalised)
+		const compiled = this.compileStyle(normalised, className)
 		this.styles.set(className, compiled)
 		return className
 	}
 
 	/**
 	 * Registers a global style rule (no scoped class).
-	 * Subsequent calls with the same selector are ignored (idempotent).
+	 * If the selector was previously registered, subsequent styles are merged.
 	 *
 	 * @param selector - CSS selector string, e.g. `"body"` or `"h1, h2"`.
 	 * @param styleObj - Style properties to apply to the selector.
 	 */
 	addGlobalStyle(selector: string, styleObj: any): void {
+		if (!styleObj || typeof styleObj !== 'object') return
 		const key = `global:${selector}`
-		if (this.styles.has(key)) return
-		const props = this.buildDeclarations(styleObj)
-		if (!props) return
-		this.styles.set(key, {
-			className: key,
-			css: `${selector} {\n${props}}`,
-			mediaQueries: {},
-			pseudoClasses: {},
-			keyframes: '',
-			supports: {},
-			layers: {}
-		})
-	}
+		const existing = this.styles.get(key)
+		const { mediaQueries, pseudoClasses, normalStyles } = this.parseStyles(styleObj)
 
-	private compileStyle(styleObj: any): CompiledStyle {
-		const { mediaQueries, pseudoClasses, normalStyles, keyframes, supports, container, layer } = this.parseStyles(styleObj)
-		const hash = generateClassHash(styleObj)
-		const className = `ns-${hash}`
 		const declarations = this.buildDeclarations(normalStyles)
-		const css = `.${className} {\n${declarations}}`
+		let baseCss = ''
+		if (declarations.trim()) {
+			baseCss = `${selector} {\n${declarations}}`
+		}
+
 		const compiledMedia: Record<string, string> = {}
 		Object.entries(mediaQueries).forEach(([query, styles]) => {
-			const normalized = normalizeMediaQuery(query)
-			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
-			if (compiledMedia[normalized]) {
-				const existing = compiledMedia[normalized]
-				const existingDeclarations = existing.split('\n').slice(2, -2).join('\n')
-				compiledMedia[normalized] =
-					`${normalized} {\n  .${className} {\n${existingDeclarations}\n${inner}  }\n}`
-			} else {
-				compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${inner}  }\n}`
+			if (styles && typeof styles === 'object') {
+				const normalized = normalizeMediaQuery(query)
+				const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
+				if (inner.trim()) {
+					compiledMedia[normalized] = `${normalized} {\n  ${selector} {\n${inner}  }\n}`
+				}
 			}
 		})
-		Object.entries(container).forEach(([query, styles]) => {
-			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
-			compiledMedia[query] = `${query} {\n  .${className} {\n${inner}  }\n}`
-		})
+
 		const compiledPseudos: Record<string, string> = {}
 		Object.entries(pseudoClasses).forEach(([pseudo, styles]) => {
-			const inner = this.buildDeclarations(styles as Record<string, any>)
-			compiledPseudos[pseudo] = `.${className}${pseudo} {\n${inner}}`
+			if (styles && typeof styles === 'object') {
+				const inner = this.buildDeclarations(styles as Record<string, any>)
+				if (inner.trim()) {
+					const target = pseudo.startsWith('&')
+						? pseudo.replace(/&/g, selector)
+						: `${selector}${pseudo}`
+					compiledPseudos[pseudo] = `${target} {\n${inner}}`
+				}
+			}
 		})
+
+		if (existing) {
+			if (baseCss) {
+				existing.css = existing.css ? `${existing.css}\n${baseCss}` : baseCss
+			}
+			Object.assign(existing.mediaQueries, compiledMedia)
+			Object.assign(existing.pseudoClasses, compiledPseudos)
+		} else {
+			this.styles.set(key, {
+				className: key,
+				css: baseCss,
+				mediaQueries: compiledMedia,
+				pseudoClasses: compiledPseudos,
+				keyframes: '',
+				supports: {},
+				layers: {}
+			})
+		}
+	}
+
+	private compileStyle(styleObj: any, className: string): CompiledStyle {
+		const { mediaQueries, pseudoClasses, normalStyles, keyframes, supports, container, layer } =
+			this.parseStyles(styleObj)
+
+		const declarations = this.buildDeclarations(normalStyles)
+		const css = declarations.trim() ? `.${className} {\n${declarations}}` : ''
+		const compiledMedia: Record<string, string> = {}
+
+		Object.entries(mediaQueries).forEach(([query, styles]) => {
+			if (styles && typeof styles === 'object') {
+				const normalized = normalizeMediaQuery(query)
+				const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
+				if (inner.trim()) {
+					if (compiledMedia[normalized]) {
+						const existing = compiledMedia[normalized]
+						const existingDeclarations = existing.split('\n').slice(2, -2).join('\n')
+						compiledMedia[normalized] =
+							`${normalized} {\n  .${className} {\n${existingDeclarations}\n${inner}  }\n}`
+					} else {
+						compiledMedia[normalized] = `${normalized} {\n  .${className} {\n${inner}  }\n}`
+					}
+				}
+			}
+		})
+
+		Object.entries(container).forEach(([query, styles]) => {
+			if (styles && typeof styles === 'object') {
+				const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
+				if (inner.trim()) {
+					compiledMedia[query] = `${query} {\n  .${className} {\n${inner}  }\n}`
+				}
+			}
+		})
+
+		const compiledPseudos: Record<string, string> = {}
+		Object.entries(pseudoClasses).forEach(([pseudo, styles]) => {
+			if (styles && typeof styles === 'object') {
+				const inner = this.buildDeclarations(styles as Record<string, any>)
+				if (inner.trim()) {
+					const selectors = pseudo
+						.split(',')
+						.map(p => {
+							const trimmed = p.trim()
+							if (trimmed.startsWith('&')) {
+								return trimmed.replace(/&/g, `.${className}`)
+							}
+							return `.${className}${trimmed}`
+						})
+						.join(', ')
+					compiledPseudos[pseudo] = `${selectors} {\n${inner}}`
+				}
+			}
+		})
+
 		let keyframesCss = ''
 		Object.entries(keyframes).forEach(([name, frames]) => {
-			keyframesCss += `@keyframes ${name} {\n`
-			Object.entries(frames as Record<string, any>).forEach(([stop, props]) => {
-				const inner = this.buildDeclarations(props as Record<string, any>, '    ')
-				keyframesCss += `  ${stop} {\n${inner}  }\n`
-			})
-			keyframesCss += '}\n'
+			if (frames && typeof frames === 'object') {
+				keyframesCss += `@keyframes ${name} {\n`
+				Object.entries(frames as Record<string, any>).forEach(([stop, props]) => {
+					if (props && typeof props === 'object') {
+						const inner = this.buildDeclarations(props as Record<string, any>, '    ')
+						keyframesCss += `  ${stop} {\n${inner}  }\n`
+					}
+				})
+				keyframesCss += '}\n'
+			}
 		})
+
 		const compiledSupports: Record<string, string> = {}
 		Object.entries(supports).forEach(([condition, styles]) => {
-			const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
-			compiledSupports[condition] = `@supports ${condition} {\n  .${className} {\n${inner}  }\n}`
+			if (styles && typeof styles === 'object') {
+				const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
+				if (inner.trim()) {
+					compiledSupports[condition] = `@supports ${condition} {\n  .${className} {\n${inner}  }\n}`
+				}
+			}
 		})
+
 		const compiledLayers: Record<string, string> = {}
 		Object.entries(layer).forEach(([name, styles]) => {
-			const inner = this.buildDeclarations(styles as Record<string, any>, '  ')
-			compiledLayers[name] = `@layer ${name} {\n${inner}}`
+			if (styles && typeof styles === 'object') {
+				const inner = this.buildDeclarations(styles as Record<string, any>, '    ')
+				if (inner.trim()) {
+					compiledLayers[name] = `@layer ${name} {\n  .${className} {\n${inner}  }\n}`
+				}
+			}
 		})
+
 		return {
 			className,
 			css,
@@ -151,6 +235,11 @@ export class StyleCollector {
 		const supports: Record<string, any> = {}
 		const container: Record<string, any> = {}
 		const layer: Record<string, any> = {}
+
+		if (!styleObj || typeof styleObj !== 'object') {
+			return { normalStyles, mediaQueries, pseudoClasses, keyframes, supports, container, layer }
+		}
+
 		Object.entries(styleObj).forEach(([key, value]) => {
 			if (key.startsWith('@keyframes ')) {
 				keyframes[key.slice('@keyframes '.length)] = value
@@ -165,7 +254,7 @@ export class StyleCollector {
 				layer[key.slice('@layer '.length) || 'default'] = value
 			} else if (key in BREAKPOINTS || key.startsWith('@media')) {
 				mediaQueries[key] = value
-			} else if (key.startsWith(':') || key.startsWith('::')) {
+			} else if (key.startsWith(':') || key.startsWith('::') || key.startsWith('&')) {
 				pseudoClasses[key] = value
 			} else {
 				normalStyles[key] = value
@@ -176,9 +265,12 @@ export class StyleCollector {
 
 	private buildDeclarations(styles: Record<string, any>, indent = '  '): string {
 		let css = ''
+		if (!styles || typeof styles !== 'object') return css
 		Object.entries(styles).forEach(([key, value]) => {
 			if (typeof value === 'string' || typeof value === 'number') {
-				css += `${indent}${camelToKebab(key)}: ${value};\n`
+				const prop = camelToKebab(key)
+				const formattedVal = addPxIfNeeded(key, value)
+				css += `${indent}${prop}: ${formattedVal};\n`
 			}
 		})
 		return css
@@ -188,8 +280,8 @@ export class StyleCollector {
 	 * Serialises all collected styles into a single CSS string.
 	 *
 	 * Output order:
-	 * 1. `@keyframes` blocks
-	 * 2. Base class rules
+	 * 1. `@keyframes` blocks (deduplicated)
+	 * 2. Base class and global rules
 	 * 3. Pseudo-class/element rules
 	 * 4. `@layer` blocks
 	 * 5. `@supports` blocks
@@ -198,26 +290,66 @@ export class StyleCollector {
 	 * @returns Full CSS string ready to be injected or written to a file.
 	 */
 	getAllStyles(): string {
-		let allCss = ''
+		const keyframesSet = new Set<string>()
+		const baseRules: string[] = []
+		const pseudoRules: string[] = []
+		const layerRules: string[] = []
+		const supportsRules: string[] = []
+		const mediaQueryMap = new Map<string, string[]>()
+
 		this.styles.forEach(style => {
-			if (style.keyframes) allCss += `${style.keyframes}\n`
-			if (style.css) allCss += `${style.css}\n`
+			if (style.keyframes && !keyframesSet.has(style.keyframes)) {
+				keyframesSet.add(style.keyframes)
+			}
+			if (style.css?.trim()) {
+				baseRules.push(style.css)
+			}
 			Object.values(style.pseudoClasses).forEach(css => {
-				allCss += `${css}\n`
+				if (css.trim()) pseudoRules.push(css)
 			})
 			Object.values(style.layers).forEach(css => {
-				allCss += `${css}\n`
+				if (css.trim()) layerRules.push(css)
 			})
 			Object.values(style.supports).forEach(css => {
-				allCss += `${css}\n`
+				if (css.trim()) supportsRules.push(css)
 			})
-			const mediaEntries = Object.entries(style.mediaQueries).sort(
-				([a], [b]) => this.extractMinWidth(a) - this.extractMinWidth(b)
-			)
-			mediaEntries.forEach(([, css]) => {
-				allCss += `${css}\n`
+			Object.entries(style.mediaQueries).forEach(([query, css]) => {
+				if (css.trim()) {
+					const list = mediaQueryMap.get(query) ?? []
+					list.push(css)
+					mediaQueryMap.set(query, list)
+				}
 			})
 		})
+
+		let allCss = ''
+		keyframesSet.forEach(kf => {
+			allCss += `${kf}\n`
+		})
+		baseRules.forEach(rule => {
+			allCss += `${rule}\n`
+		})
+		pseudoRules.forEach(rule => {
+			allCss += `${rule}\n`
+		})
+		layerRules.forEach(rule => {
+			allCss += `${rule}\n`
+		})
+		supportsRules.forEach(rule => {
+			allCss += `${rule}\n`
+		})
+
+		const sortedMedia = Array.from(mediaQueryMap.keys()).sort((a, b) => {
+			return this.extractMinWidth(a) - this.extractMinWidth(b)
+		})
+
+		sortedMedia.forEach(query => {
+			const rules = mediaQueryMap.get(query) ?? []
+			rules.forEach(rule => {
+				allCss += `${rule}\n`
+			})
+		})
+
 		return allCss
 	}
 
@@ -230,25 +362,25 @@ export class StyleCollector {
 	 * Writes all collected styles to a temp file so the PostCSS plugin
 	 * (which runs in a separate process) can read them.
 	 *
-	 * Call this after all `css()` / `global()` calls have been evaluated,
-	 * e.g. at the end of a build-time entry point.
+	 * Safely guarded against browser / non-Node environments.
 	 *
-	 * @param filePath - Destination file path. Defaults to `os.tmpdir()/next-style.css`.
+	 * @param filePath - Destination file path.
 	 */
 	flush(filePath?: string): void {
+		if (typeof globalThis !== 'undefined' && (globalThis as any).window !== undefined) return
 		try {
+			if (!fs || typeof fs.mkdirSync !== 'function') return
 			const dest = filePath ?? StyleCollector.defaultCacheFile()
 			fs.mkdirSync(path.dirname(dest), { recursive: true })
 			fs.writeFileSync(dest, this.getAllStyles(), 'utf-8')
-		} catch (err) {
-			console.error('Failed to flush styles to cache file:', err)
+		} catch {
+			// Do not throw or spam errors in restricted environments
 		}
 	}
 
 	/**
 	 * Returns the default cache file path, resolved at call-time from
-	 * `process.cwd()` so it reflects the actual working directory of the
-	 * running process rather than the directory at module-load time.
+	 * `process.cwd()`.
 	 */
 	static defaultCacheFile(): string {
 		return path.join(process.cwd(), 'node_modules', '.cache', 'next-style', 'styles.css')

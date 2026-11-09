@@ -5,7 +5,14 @@ import postcss from 'postcss'
 import { StyleCollector } from '../compiler'
 import { BREAKPOINTS } from '../utils'
 
-const IMPORT_RE = /^next-style$/
+function isNextStyleImport(params: string): boolean {
+	const cleaned = params
+		.replace(/^url\(/, '')
+		.replace(/\)$/, '')
+		.replace(/['"]/g, '')
+		.trim()
+	return cleaned === 'next-style' || cleaned.startsWith('next-style ')
+}
 
 function findProjectRoot(fromFile: string): string | null {
 	let dir = path.dirname(fromFile)
@@ -23,7 +30,7 @@ export function resolveCacheFile(from: string | undefined): string {
 }
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.mts']
-const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'out', '.cache'])
+const SKIP_DIRS = new Set(['node_modules', '.next', '.git', 'dist', 'out', '.cache', '.turbo', 'build', 'coverage'])
 
 function collectSourceFiles(dir: string): string[] {
 	const files: string[] = []
@@ -45,7 +52,7 @@ function collectSourceFiles(dir: string): string[] {
 	return files
 }
 
-function safeEvalObject(src: string): Record<string, any> | null {
+export function safeEvalObject(src: string): Record<string, any> | null {
 	try {
 		const fn = new Function(`"use strict"; return (${src});`)
 		const result = fn()
@@ -53,12 +60,20 @@ function safeEvalObject(src: string): Record<string, any> | null {
 	} catch {}
 	try {
 		const sanitised = src
-			.replace(/\s+(?:as|satisfies)\s+\w[\w.<>[\], |&]*/g, '')
-			.replace(/`[^`]*`/g, '"__tmpl__"')
-			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*)(?=\s*[,}])/g, (_m, id) => {
-				if (id === 'true' || id === 'false' || id === 'null' || id === 'undefined') return id
-				return '"__ref__"'
+			.replace(/\s+(?:as|satisfies)\s+[^,}\n]+/g, '')
+			.replace(/\.\.\.[a-zA-Z_$][\w$.]*/g, '')
+			.replace(/`[^`]*`/g, '""')
+			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*\s*\([^)]*\))(?=\s*[,}\n])/g, '""')
+			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*)(?=\s*[,}\n])/g, (_m, id) => {
+				const trimmed = id.trim()
+				if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || trimmed === 'undefined') {
+					return trimmed
+				}
+				return '""'
 			})
+			.replace(/,\s*,/g, ',')
+			.replace(/\{\s*,/g, '{')
+			.replace(/,\s*\}/g, '}')
 		const fn2 = new Function(`"use strict"; return (${sanitised});`)
 		const result2 = fn2()
 		if (result2 && typeof result2 === 'object' && !Array.isArray(result2)) return result2
@@ -66,33 +81,61 @@ function safeEvalObject(src: string): Record<string, any> | null {
 	return null
 }
 
-function extractBalancedBraces(src: string, startIdx: number): string | null {
+export function extractBalancedBraces(src: string, startIdx: number): string | null {
 	let depth = 0
 	let i = startIdx
 	let inStr: string | null = null
-	let tmplDepth = 0
+	const tmplBraceStack: number[] = []
+
 	while (i < src.length) {
 		const ch = src[i]
+		const next = src[i + 1]
+
+		// Skip comments if not inside string
+		if (!inStr) {
+			if (ch === '/' && next === '/') {
+				i += 2
+				while (i < src.length && src[i] !== '\n') i++
+				continue
+			}
+			if (ch === '/' && next === '*') {
+				i += 2
+				while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++
+				i += 2
+				continue
+			}
+		}
+
 		if (inStr === '`') {
-			if (ch === '\\') { i += 2; continue }
-			if (ch === '`') { inStr = null }
-			else if (ch === '$' && src[i + 1] === '{') {
-				tmplDepth++
+			if (ch === '\\') {
+				i += 2
+				continue
+			}
+			if (ch === '`') {
+				inStr = null
+			} else if (ch === '$' && next === '{') {
+				tmplBraceStack.push(depth)
+				inStr = null
 				i += 2
 				continue
 			}
 		} else if (inStr) {
-			if (ch === '\\') { i += 2; continue }
-			if (ch === inStr) inStr = null
+			if (ch === '\\') {
+				i += 2
+				continue
+			}
+			if (ch === inStr) {
+				inStr = null
+			}
 		} else {
 			if (ch === '"' || ch === "'" || ch === '`') {
 				inStr = ch
 			} else if (ch === '{') {
-				if (tmplDepth > 0) tmplDepth++
-				else depth++
+				depth++
 			} else if (ch === '}') {
-				if (tmplDepth > 0) {
-					tmplDepth--
+				if (tmplBraceStack.length > 0 && depth === tmplBraceStack[tmplBraceStack.length - 1]) {
+					tmplBraceStack.pop()
+					inStr = '`'
 				} else {
 					depth--
 					if (depth === 0) return src.slice(startIdx, i + 1)
@@ -106,7 +149,7 @@ function extractBalancedBraces(src: string, startIdx: number): string | null {
 
 function scanFile(src: string, collector: StyleCollector): number {
 	let found = 0
-	const cssRe = /\bcss\s*\(\s*(\{)/g
+	const cssRe = /\bcss\s*(?:<[^>]*>)?\s*\(\s*(\{)/g
 	let m: RegExpExecArray | null
 	while ((m = cssRe.exec(src)) !== null) {
 		const braceStart = m.index + m[0].length - 1
@@ -118,7 +161,7 @@ function scanFile(src: string, collector: StyleCollector): number {
 		collector.addStyle(normalised)
 		found++
 	}
-	const globalRe = /\bglobal\s*\(\s*(\{)/g
+	const globalRe = /\bglobal\s*(?:<[^>]*>)?\s*\(\s*(\{)/g
 	while ((m = globalRe.exec(src)) !== null) {
 		const braceStart = m.index + m[0].length - 1
 		const raw = extractBalancedBraces(src, braceStart)
@@ -136,6 +179,7 @@ function scanFile(src: string, collector: StyleCollector): number {
 }
 
 function normaliseCSSObject(obj: Record<string, any>): Record<string, any> {
+	if (!obj || typeof obj !== 'object') return {}
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
 		const key = BREAKPOINTS[k] ?? k
@@ -186,9 +230,10 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 					console.warn('[next-style] Failed to read cache file:', err)
 				}
 			}
-			if (!cssContent.trim()) {
-				cssContent = scanProjectStyles(projectRoot)
-				if (cssContent.trim()) {
+			if (!cssContent.trim() || process.env.NODE_ENV !== 'production') {
+				const scanned = scanProjectStyles(projectRoot)
+				if (scanned.trim()) {
+					cssContent = scanned
 					try {
 						fs.mkdirSync(path.dirname(cacheFile), { recursive: true })
 						fs.writeFileSync(cacheFile, cssContent, 'utf-8')
@@ -226,8 +271,7 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				}
 			}
 			root.walkAtRules('import', atRule => {
-				const val = atRule.params.replace(/['"]/g, '').trim()
-				if (!IMPORT_RE.test(val)) return
+				if (!isNextStyleImport(atRule.params.trim())) return
 				if (cssContent.trim()) {
 					atRule.replaceWith(postcss.parse(cssContent))
 				} else {

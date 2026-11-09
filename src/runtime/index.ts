@@ -32,6 +32,7 @@ type AtRuleStyles = {
  * - Responsive breakpoints: `'@sm'`, `'@md'`, `'@lg'`, `'@xl'`, `'@2xl'`
  * - Arbitrary media queries: `'@media (min-width: 900px)'`
  * - Pseudo-classes and pseudo-elements: `':hover'`, `'::before'`, etc.
+ * - Nested selectors: `'&:hover'`, `'&.active'`, `'& > span'`
  * - Container queries: `'@container sidebar (min-width: 300px)'`
  * - Feature queries: `'@supports (display: grid)'`
  * - Keyframe animations: `'@keyframes fadeIn'`
@@ -74,9 +75,18 @@ export type CSSObject = CSSProperties &
  *   return <button className={button}>Click me</button>
  * }
  */
-export function css(styles: CSSObject): string {
+function isServer(): boolean {
+	return typeof globalThis !== 'undefined' && (globalThis as any).window === undefined
+}
+
+export function css(styles?: CSSObject | null): string {
+	if (!styles || typeof styles !== 'object') {
+		return 'ns-0'
+	}
 	const className = collector.addStyle(styles)
-	collector.flush()
+	if (isServer() && process.env.NODE_ENV !== 'production') {
+		collector.flush()
+	}
 	return className
 }
 
@@ -95,11 +105,14 @@ export function css(styles: CSSObject): string {
  *   'h1, h2, h3': { fontWeight: 500 },
  * })
  */
-export function global(styles: Record<string, CSSObject>): void {
+export function global(styles?: Record<string, CSSObject> | null): void {
+	if (!styles || typeof styles !== 'object') return
 	Object.entries(styles).forEach(([selector, styleObj]) => {
 		collector.addGlobalStyle(selector, styleObj)
 	})
-	collector.flush()
+	if (isServer() && process.env.NODE_ENV !== 'production') {
+		collector.flush()
+	}
 }
 
 /**

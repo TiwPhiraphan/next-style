@@ -2,6 +2,7 @@ export { type CompiledStyle, createTransformer, StyleCollector } from './compile
 export { type CSSObject, type CSSProperties, css, global, styleCollector } from './runtime'
 export {
 	BREAKPOINTS,
+	addPxIfNeeded,
 	camelToKebab,
 	deduplicateStyles,
 	generateClassHash,
