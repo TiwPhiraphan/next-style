@@ -81,14 +81,14 @@ describe('utils', () => {
 	describe('deduplicateStyles', () => {
 		it('should remove identical styles regardless of key order', () => {
 			const map = new Map<string, any>()
-			map.set('ns-1', { color: 'red', fontSize: '14px' })
-			map.set('ns-2', { fontSize: '14px', color: 'red' })
-			map.set('ns-3', { color: 'blue' })
+			map.set('next-1', { color: 'red', fontSize: '14px' })
+			map.set('next-2', { fontSize: '14px', color: 'red' })
+			map.set('next-3', { color: 'blue' })
 
 			const deduped = deduplicateStyles(map)
 			expect(deduped.size).toBe(2)
-			expect(deduped.has('ns-1')).toBe(true)
-			expect(deduped.has('ns-3')).toBe(true)
+			expect(deduped.has('next-1')).toBe(true)
+			expect(deduped.has('next-3')).toBe(true)
 		})
 	})
 })

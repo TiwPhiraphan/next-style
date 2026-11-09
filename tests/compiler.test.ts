@@ -112,6 +112,6 @@ describe('compiler', () => {
 		})
 		const output = collector.getAllStyles()
 		// Should not have a base rule with nothing inside
-		expect(output.match(/\.ns-[a-z0-9]+\s*\{\s*\}/)).toBeNull()
+		expect(output.match(/\.next-[a-z0-9]+\s*\{\s*\}/)).toBeNull()
 	})
 })

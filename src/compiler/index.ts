@@ -30,8 +30,8 @@ export interface CompiledStyle {
  *
  * @example
  * const collector = new StyleCollector()
- * const className = collector.addStyle({ color: 'red' }) // "ns-abc123"
- * const css = collector.getAllStyles() // ".ns-abc123 { color: red; }"
+ * const className = collector.addStyle({ color: 'red' }) // "next-abc123"
+ * const css = collector.getAllStyles() // ".next-abc123 { color: red; }"
  */
 export class StyleCollector {
 	private styles = new Map<string, CompiledStyle>()
@@ -45,11 +45,11 @@ export class StyleCollector {
 	 */
 	addStyle(styleObj: any): string {
 		if (!styleObj || typeof styleObj !== 'object') {
-			return 'ns-0'
+			return 'next-0'
 		}
 		const normalised = normaliseStyleKeys(styleObj)
 		const hash = generateClassHash(normalised)
-		const className = `ns-${hash}`
+		const className = `next-${hash}`
 		if (this.styles.has(className)) {
 			return className
 		}
@@ -93,9 +93,7 @@ export class StyleCollector {
 			if (styles && typeof styles === 'object') {
 				const inner = this.buildDeclarations(styles as Record<string, any>)
 				if (inner.trim()) {
-					const target = pseudo.startsWith('&')
-						? pseudo.replace(/&/g, selector)
-						: `${selector}${pseudo}`
+					const target = pseudo.startsWith('&') ? pseudo.replace(/&/g, selector) : `${selector}${pseudo}`
 					compiledPseudos[pseudo] = `${target} {\n${inner}}`
 				}
 			}

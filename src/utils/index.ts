@@ -136,7 +136,7 @@ function canonicalizeObject(obj: any): any {
 
 /**
  * Generates a short, stable hash string from a style object or string.
- * Used to produce unique class name suffixes (e.g. `"ns-1x2y3z"`).
+ * Used to produce unique class name suffixes (e.g. `"next-1x2y3z"`).
  *
  * Keys are canonicalized before hashing to ensure identical style objects
  * with different key orders always produce the exact same hash.

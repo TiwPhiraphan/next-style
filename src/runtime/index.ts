@@ -60,7 +60,7 @@ export type CSSObject = CSSProperties &
  * Identical style objects always return the same class name (deduplication).
  *
  * @param styles - A `CSSObject` describing the styles for this element.
- * @returns A stable class name string (e.g. `"ns-1x2y3z"`).
+ * @returns A stable class name string (e.g. `"next-1x2y3z"`).
  *
  * @example
  * const button = css({
@@ -81,7 +81,7 @@ function isServer(): boolean {
 
 export function css(styles?: CSSObject | null): string {
 	if (!styles || typeof styles !== 'object') {
-		return 'ns-0'
+		return 'next-0'
 	}
 	const className = collector.addStyle(styles)
 	if (isServer() && process.env.NODE_ENV !== 'production') {

@@ -183,9 +183,7 @@ function normaliseCSSObject(obj: Record<string, any>): Record<string, any> {
 	const out: Record<string, any> = {}
 	for (const [k, v] of Object.entries(obj)) {
 		const key = BREAKPOINTS[k] ?? k
-		out[key] = v && typeof v === 'object' && !Array.isArray(v)
-			? normaliseCSSObject(v)
-			: v
+		out[key] = v && typeof v === 'object' && !Array.isArray(v) ? normaliseCSSObject(v) : v
 	}
 	return out
 }
@@ -195,7 +193,11 @@ function scanProjectStyles(projectRoot: string): string {
 	const files = collectSourceFiles(projectRoot)
 	for (const file of files) {
 		let src: string
-		try { src = fs.readFileSync(file, 'utf-8') } catch { continue }
+		try {
+			src = fs.readFileSync(file, 'utf-8')
+		} catch {
+			continue
+		}
 		scanFile(src, collector)
 	}
 	return collector.getAllStyles()
@@ -241,8 +243,7 @@ function nextStylePlugin(opts: PluginOptions = {}) {
 				}
 			}
 			const isProduction =
-				process.env.NODE_ENV === 'production' ||
-				process.env.NEXT_PHASE === 'phase-production-build'
+				process.env.NODE_ENV === 'production' || process.env.NEXT_PHASE === 'phase-production-build'
 			if (isProduction && cssContent.trim()) {
 				try {
 					const minifyResult = await postcss([
