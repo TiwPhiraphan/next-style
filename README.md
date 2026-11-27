@@ -112,7 +112,7 @@ export function Counter() {
 }
 ```
 
-Both work identically — the `css()` call is evaluated at build time regardless of component type.
+Both work identically — static `css()` calls are extracted at build time via TypeScript AST regardless of component type.
 
 ## Example
 
@@ -146,8 +146,8 @@ export function Button() {
 | ♻️ **Deduplication**    | Identical style objects always hash to the same class name                                |
 | 🌍 **Global styles**    | `global()` for resets, base typography, and third-party overrides                         |
 | 🎞️ **Keyframes**        | Declare `@keyframes` inline next to the style that uses them                              |
-| 📦 **Tiny**             | ~2 KB minified + gzipped                                                                  |
-| 🚀 **Fast builds**      | Negligible build-time overhead — simple hashing and string concatenation                  |
+| 📦 **Tiny**             | ~3 KB runtime (`~4 KB` PostCSS plugin), minified + gzipped                                |
+| 🚀 **Fast builds**      | Safe TypeScript AST extraction with zero arbitrary code execution                         |
 | 🎨 **CSS-in-JS power**  | All CSS features: pseudo-classes, container queries, `@supports`, `@layer`, CSS variables |
 
 Full support for pseudo-classes, pseudo-elements, media queries, container queries, `@supports`, `@layer`, and CSS variables.
@@ -175,10 +175,10 @@ bun add next-style
 
 **Peer dependencies required:**
 
-- `next >= 15.0.0`
 - `postcss >= 8.0.0`
+- `typescript >= 5.0.0`
 
-> Most Next.js projects already include PostCSS. If you're unsure, check your `package.json` or run `npm list postcss`.
+> Most Next.js projects already include both PostCSS and TypeScript. If you're unsure, check your `package.json` or run `npm list postcss typescript`.
 
 ## Setup
 
@@ -424,9 +424,29 @@ Because PostCSS runs in a separate process from the module graph, in-memory styl
 
 This is why `@import "next-style"` must appear in `globals.css` — it's the injection point.
 
-### CSS Variables
+### CSS Variables & Dynamic Values
 
-next-style pairs naturally with CSS custom properties for design tokens:
+Because **next-style** extracts styles statically at build time using the TypeScript AST parser (without executing application code), arguments to `css()` and `global()` must be static object literals. Dynamic expressions — such as variables, spread operators (`...styles`), function calls, computed keys, or ternaries — are skipped with a build warning.
+
+For dynamic values at runtime, combine static `css()` rules with CSS custom properties:
+
+```tsx
+const badge = css({
+	color: 'var(--c)',
+	padding: '4px 10px',
+	borderRadius: '9999px'
+})
+
+export function Badge({ color, children }: { color: string; children: React.ReactNode }) {
+	return (
+		<span className={badge} style={{ '--c': color } as React.CSSProperties}>
+			{children}
+		</span>
+	)
+}
+```
+
+You can also define global design tokens in `global()` and reference them in `css()`:
 
 ```tsx
 // Define tokens once in global()
@@ -452,58 +472,57 @@ const card = css({
 
 Styles are emitted in this order to ensure correct cascade:
 
-1. `@keyframes` blocks
-2. Base class rules
-3. Pseudo-class / pseudo-element rules
+1. `@keyframes` blocks (deduplicated)
+2. Base class and global rules
+3. Pseudo-class / pseudo-element and nested selector rules
 4. `@layer` blocks
 5. `@supports` blocks
-6. Media queries (ascending `min-width`, mobile-first)
+6. `@container` blocks
+7. Media queries (`min-width` ascending, `max-width` descending, other media queries in insertion order)
 
 ## Performance
 
 | Metric            | Value                                         |
 | ----------------- | --------------------------------------------- |
-| Runtime JS        | **0 bytes**                                   |
-| Bundle size       | ~2 KB minified + gzipped                      |
-| Build overhead    | Negligible — hashing + string emit only       |
+| Runtime JS        | **0 bytes** of style injection                |
+| Bundle size       | ~2.9 KB runtime / ~4.2 KB plugin (gzipped)    |
+| Build overhead    | Static TypeScript AST scan + string emit      |
 | CSS deduplication | Automatic — one class per unique style object |
 
 Because styles are extracted at build time, there is no style recalculation, no `<style>` injection, and no FOUC. The output is a single static CSS file.
 
 ## Best Practices & Common Patterns
 
-### Reusable Style Objects
+### Reusable Styles
 
-Create reusable style definitions by storing them in separate files:
+Compose reusable static `css()` classes by concatenating class names:
 
 ```tsx
 // styles/components.ts
-import { type CSSObject } from 'next-style'
+import { css } from 'next-style'
 
-export const buttonBase: CSSObject = {
+export const buttonBase = css({
 	padding: '8px 16px',
 	borderRadius: '6px',
 	fontWeight: 500,
 	cursor: 'pointer',
 	transition: 'all 0.2s',
 	':active': { transform: 'scale(0.98)' }
-}
+})
 
-export const buttonPrimary: CSSObject = {
-	...buttonBase,
+export const buttonPrimary = css({
 	backgroundColor: '#7F77DD',
 	color: 'white',
 	':hover': { backgroundColor: '#534AB7' }
-}
+})
 ```
 
 ```tsx
 // components/Button.tsx
-import { css } from 'next-style'
-import { buttonPrimary } from '@/styles/components'
+import { buttonBase, buttonPrimary } from '@/styles/components'
 
 export function Button({ children }: { children: React.ReactNode }) {
-	return <button className={css(buttonPrimary)}>{children}</button>
+	return <button className={`${buttonBase} ${buttonPrimary}`}>{children}</button>
 }
 ```
 
@@ -553,10 +572,10 @@ const card = css({
 
 ### Variant Patterns
 
-Create component variants by conditionally merging styles:
+Create component variants by mapping static `css()` classes and joining them:
 
 ```tsx
-import { css, type CSSObject } from 'next-style'
+import { css } from 'next-style'
 
 interface ButtonProps {
 	variant?: 'primary' | 'secondary' | 'ghost'
@@ -564,44 +583,38 @@ interface ButtonProps {
 	children: React.ReactNode
 }
 
-export function Button({ variant = 'primary', size = 'md', children }: ButtonProps) {
-	const baseStyles: CSSObject = {
-		fontWeight: 500,
-		borderRadius: '6px',
-		cursor: 'pointer',
-		transition: 'all 0.2s'
-	}
+const baseClass = css({
+	fontWeight: 500,
+	borderRadius: '6px',
+	cursor: 'pointer',
+	transition: 'all 0.2s'
+})
 
-	const variantStyles: Record<string, CSSObject> = {
-		primary: {
-			backgroundColor: 'var(--color-primary)',
-			color: 'white',
-			':hover': { backgroundColor: 'var(--color-secondary)' }
-		},
-		secondary: {
-			backgroundColor: 'var(--color-secondary)',
-			color: 'white'
-		},
-		ghost: {
-			backgroundColor: 'transparent',
-			color: 'var(--color-primary)',
-			':hover': { backgroundColor: 'rgba(127, 119, 221, 0.1)' }
-		}
-	}
-
-	const sizeStyles: Record<string, CSSObject> = {
-		sm: { padding: '4px 12px', fontSize: '14px' },
-		md: { padding: '8px 16px', fontSize: '16px' },
-		lg: { padding: '12px 24px', fontSize: '18px' }
-	}
-
-	const className = css({
-		...baseStyles,
-		...variantStyles[variant],
-		...sizeStyles[size]
+const variantClasses = {
+	primary: css({
+		backgroundColor: 'var(--color-primary)',
+		color: 'white',
+		':hover': { backgroundColor: 'var(--color-secondary)' }
+	}),
+	secondary: css({
+		backgroundColor: 'var(--color-secondary)',
+		color: 'white'
+	}),
+	ghost: css({
+		backgroundColor: 'transparent',
+		color: 'var(--color-primary)',
+		':hover': { backgroundColor: 'rgba(127, 119, 221, 0.1)' }
 	})
+}
 
-	return <button className={className}>{children}</button>
+const sizeClasses = {
+	sm: css({ padding: '4px 12px', fontSize: '14px' }),
+	md: css({ padding: '8px 16px', fontSize: '16px' }),
+	lg: css({ padding: '12px 24px', fontSize: '18px' })
+}
+
+export function Button({ variant = 'primary', size = 'md', children }: ButtonProps) {
+	return <button className={`${baseClass} ${variantClasses[variant]} ${sizeClasses[size]}`}>{children}</button>
 }
 ```
 
@@ -759,9 +772,9 @@ Older browsers are supported through standard CSS features used. All advanced CS
 ### Architecture Overview
 
 1. **Build Time (Development & Production)**
-   - Your `css()` and `global()` calls are evaluated
-   - Each unique style object is hashed and assigned a class name (e.g., `next-abc123`)
-   - Compiled CSS is written to `node_modules/.cache/next-style/styles.css`
+   - In dev, `css()` and `global()` calls batch-write compiled CSS via `queueMicrotask` to `node_modules/.cache/next-style/styles.css`
+   - For cold/production builds (and dev refresh), the PostCSS plugin scans your source files using the TypeScript AST parser without executing code
+   - Each unique static style object is hashed and assigned a deterministic class name (e.g., `next-abc123`)
 
 2. **PostCSS Processing**
    - The PostCSS plugin reads the cache file

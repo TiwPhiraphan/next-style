@@ -1,7 +1,7 @@
 import { build, type Options } from 'tsup'
 
 const options: Options = {
-	external: ['csstype'],
+	external: ['csstype', 'cssnano', 'postcss', 'typescript'],
 	sourcemap: false,
 	splitting: false,
 	outDir: 'dist',

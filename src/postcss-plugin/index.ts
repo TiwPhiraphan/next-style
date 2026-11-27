@@ -2,8 +2,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import cssnano from 'cssnano'
 import postcss from 'postcss'
+import ts from 'typescript'
 import { StyleCollector } from '../compiler'
-import { BREAKPOINTS } from '../utils'
 
 function isNextStyleImport(params: string): boolean {
 	const cleaned = params
@@ -52,140 +52,132 @@ function collectSourceFiles(dir: string): string[] {
 	return files
 }
 
-export function safeEvalObject(src: string): Record<string, any> | null {
-	try {
-		const fn = new Function(`"use strict"; return (${src});`)
-		const result = fn()
-		if (result && typeof result === 'object' && !Array.isArray(result)) return result
-	} catch {}
-	try {
-		const sanitised = src
-			.replace(/\s+(?:as|satisfies)\s+[^,}\n]+/g, '')
-			.replace(/\.\.\.[a-zA-Z_$][\w$.]*/g, '')
-			.replace(/`[^`]*`/g, '""')
-			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*\s*\([^)]*\))(?=\s*[,}\n])/g, '""')
-			.replace(/(?<=:\s*)([a-zA-Z_$][\w$.]*)(?=\s*[,}\n])/g, (_m, id) => {
-				const trimmed = id.trim()
-				if (trimmed === 'true' || trimmed === 'false' || trimmed === 'null' || trimmed === 'undefined') {
-					return trimmed
-				}
-				return '""'
-			})
-			.replace(/,\s*,/g, ',')
-			.replace(/\{\s*,/g, '{')
-			.replace(/,\s*\}/g, '}')
-		const fn2 = new Function(`"use strict"; return (${sanitised});`)
-		const result2 = fn2()
-		if (result2 && typeof result2 === 'object' && !Array.isArray(result2)) return result2
-	} catch {}
-	return null
+function getScriptKind(filePath: string): ts.ScriptKind {
+	const ext = path.extname(filePath).toLowerCase()
+	switch (ext) {
+		case '.tsx':
+			return ts.ScriptKind.TSX
+		case '.jsx':
+			return ts.ScriptKind.JSX
+		case '.js':
+		case '.mjs':
+			return ts.ScriptKind.JS
+		default:
+			return ts.ScriptKind.TS
+	}
 }
 
-export function extractBalancedBraces(src: string, startIdx: number): string | null {
-	let depth = 0
-	let i = startIdx
-	let inStr: string | null = null
-	const tmplBraceStack: number[] = []
-
-	while (i < src.length) {
-		const ch = src[i]
-		const next = src[i + 1]
-
-		// Skip comments if not inside string
-		if (!inStr) {
-			if (ch === '/' && next === '/') {
-				i += 2
-				while (i < src.length && src[i] !== '\n') i++
-				continue
-			}
-			if (ch === '/' && next === '*') {
-				i += 2
-				while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++
-				i += 2
-				continue
-			}
-		}
-
-		if (inStr === '`') {
-			if (ch === '\\') {
-				i += 2
-				continue
-			}
-			if (ch === '`') {
-				inStr = null
-			} else if (ch === '$' && next === '{') {
-				tmplBraceStack.push(depth)
-				inStr = null
-				i += 2
-				continue
-			}
-		} else if (inStr) {
-			if (ch === '\\') {
-				i += 2
-				continue
-			}
-			if (ch === inStr) {
-				inStr = null
-			}
+function unwrapExpression(node: ts.Expression): ts.Expression {
+	let current = node
+	while (true) {
+		if (ts.isParenthesizedExpression(current)) {
+			current = current.expression
+		} else if (
+			ts.isAsExpression(current) ||
+			ts.isSatisfiesExpression(current) ||
+			ts.isTypeAssertionExpression(current)
+		) {
+			current = current.expression
 		} else {
-			if (ch === '"' || ch === "'" || ch === '`') {
-				inStr = ch
-			} else if (ch === '{') {
-				depth++
-			} else if (ch === '}') {
-				if (tmplBraceStack.length > 0 && depth === tmplBraceStack[tmplBraceStack.length - 1]) {
-					tmplBraceStack.pop()
-					inStr = '`'
-				} else {
-					depth--
-					if (depth === 0) return src.slice(startIdx, i + 1)
+			return current
+		}
+	}
+}
+
+export function evalLiteral(node: ts.Expression): any {
+	const expr = unwrapExpression(node)
+
+	if (ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+		return expr.text
+	}
+
+	if (ts.isNumericLiteral(expr)) {
+		return Number(expr.text)
+	}
+
+	if (ts.isPrefixUnaryExpression(expr)) {
+		const operand = unwrapExpression(expr.operand)
+		if (ts.isNumericLiteral(operand)) {
+			if (expr.operator === ts.SyntaxKind.MinusToken) return -Number(operand.text)
+			if (expr.operator === ts.SyntaxKind.PlusToken) return Number(operand.text)
+		}
+		throw new Error(`Unsupported unary expression: ${expr.getText()}`)
+	}
+
+	if (ts.isObjectLiteralExpression(expr)) {
+		const out: Record<string, any> = {}
+		for (const prop of expr.properties) {
+			if (ts.isSpreadAssignment(prop)) {
+				throw new Error('Spread properties are not supported in static style extraction')
+			}
+			if (ts.isShorthandPropertyAssignment(prop)) {
+				throw new Error(`Shorthand property "${prop.name.text}" is not supported in static style extraction`)
+			}
+			if (ts.isComputedPropertyName(prop.name)) {
+				throw new Error('Computed property keys are not supported in static style extraction')
+			}
+			if (!ts.isPropertyAssignment(prop)) {
+				throw new Error('Unsupported property in style object')
+			}
+			let key: string
+			if (
+				ts.isIdentifier(prop.name) ||
+				ts.isStringLiteral(prop.name) ||
+				ts.isNoSubstitutionTemplateLiteral(prop.name) ||
+				ts.isNumericLiteral(prop.name)
+			) {
+				key = prop.name.text
+			} else {
+				throw new Error('Unsupported property key in style object')
+			}
+			out[key] = evalLiteral(prop.initializer)
+		}
+		return out
+	}
+
+	throw new Error(`Dynamic or unsupported expression: ${expr.getText()}`)
+}
+
+export function scanFile(src: string, collector: StyleCollector, filePath = '<inline>'): number {
+	let found = 0
+	const sourceFile = ts.createSourceFile(filePath, src, ts.ScriptTarget.Latest, true, getScriptKind(filePath))
+
+	const visit = (node: ts.Node): void => {
+		if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+			const fnName = node.expression.text
+			if ((fnName === 'css' || fnName === 'global') && node.arguments.length > 0) {
+				const arg = unwrapExpression(node.arguments[0])
+				if (arg.kind === ts.SyntaxKind.NullKeyword || (ts.isIdentifier(arg) && arg.text === 'undefined')) {
+					ts.forEachChild(node, visit)
+					return
+				}
+				try {
+					const evaluated = evalLiteral(arg)
+					if (evaluated && typeof evaluated === 'object' && !Array.isArray(evaluated)) {
+						if (fnName === 'css') {
+							collector.addStyle(evaluated)
+							found++
+						} else {
+							for (const [selector, styles] of Object.entries(evaluated)) {
+								if (styles && typeof styles === 'object') {
+									collector.addGlobalStyle(selector, styles as any)
+									found++
+								}
+							}
+						}
+					}
+				} catch (err) {
+					const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile))
+					const message = err instanceof Error ? err.message : String(err)
+					console.warn(`[next-style] Skipping ${fnName}() at ${filePath}:${line + 1}: ${message}`)
 				}
 			}
 		}
-		i++
+		ts.forEachChild(node, visit)
 	}
-	return null
-}
 
-function scanFile(src: string, collector: StyleCollector): number {
-	let found = 0
-	const cssRe = /\bcss\s*(?:<[^>]*>)?\s*\(\s*(\{)/g
-	let m: RegExpExecArray | null
-	while ((m = cssRe.exec(src)) !== null) {
-		const braceStart = m.index + m[0].length - 1
-		const raw = extractBalancedBraces(src, braceStart)
-		if (!raw) continue
-		const obj = safeEvalObject(raw)
-		if (!obj) continue
-		const normalised = normaliseCSSObject(obj)
-		collector.addStyle(normalised)
-		found++
-	}
-	const globalRe = /\bglobal\s*(?:<[^>]*>)?\s*\(\s*(\{)/g
-	while ((m = globalRe.exec(src)) !== null) {
-		const braceStart = m.index + m[0].length - 1
-		const raw = extractBalancedBraces(src, braceStart)
-		if (!raw) continue
-		const obj = safeEvalObject(raw)
-		if (!obj || typeof obj !== 'object') continue
-		for (const [selector, styles] of Object.entries(obj)) {
-			if (styles && typeof styles === 'object') {
-				collector.addGlobalStyle(selector, styles as any)
-				found++
-			}
-		}
-	}
+	visit(sourceFile)
 	return found
-}
-
-function normaliseCSSObject(obj: Record<string, any>): Record<string, any> {
-	if (!obj || typeof obj !== 'object') return {}
-	const out: Record<string, any> = {}
-	for (const [k, v] of Object.entries(obj)) {
-		const key = BREAKPOINTS[k] ?? k
-		out[key] = v && typeof v === 'object' && !Array.isArray(v) ? normaliseCSSObject(v) : v
-	}
-	return out
 }
 
 function scanProjectStyles(projectRoot: string): string {
@@ -198,7 +190,7 @@ function scanProjectStyles(projectRoot: string): string {
 		} catch {
 			continue
 		}
-		scanFile(src, collector)
+		scanFile(src, collector, file)
 	}
 	return collector.getAllStyles()
 }

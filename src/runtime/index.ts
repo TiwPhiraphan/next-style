@@ -8,19 +8,19 @@ import { StyleCollector } from '../compiler'
 export type CSSProperties = Properties<string | number>
 
 /** @internal Mapped type for pseudo-classes/elements — avoids index signature limitation */
-type PseudoStyles = { [P in Pseudos]?: CSSProperties }
+type PseudoStyles = { [P in Pseudos]?: CSSObject }
 
 /** @internal At-rule keys (@media, @container, @supports, @layer, @keyframes) */
 type AtRuleStyles = {
-	'@sm'?: CSSProperties
-	'@md'?: CSSProperties
-	'@lg'?: CSSProperties
-	'@xl'?: CSSProperties
-	'@2xl'?: CSSProperties
-	[media: `@media ${string}`]: CSSProperties
-	[container: `@container ${string}`]: CSSProperties
-	[supports: `@supports ${string}`]: CSSProperties
-	[layer: `@layer ${string}`]: CSSProperties
+	'@sm'?: CSSObject
+	'@md'?: CSSObject
+	'@lg'?: CSSObject
+	'@xl'?: CSSObject
+	'@2xl'?: CSSObject
+	[media: `@media ${string}`]: CSSObject
+	[container: `@container ${string}`]: CSSObject
+	[supports: `@supports ${string}`]: CSSObject
+	[layer: `@layer ${string}`]: CSSObject
 	[keyframes: `@keyframes ${string}`]: Record<string, CSSProperties>
 }
 
@@ -52,6 +52,21 @@ export type CSSObject = CSSProperties &
 		[key: string]: any
 	}
 
+function isServer(): boolean {
+	return typeof globalThis !== 'undefined' && (globalThis as any).window === undefined
+}
+
+let flushScheduled = false
+
+function scheduleFlush(): void {
+	if (flushScheduled) return
+	flushScheduled = true
+	queueMicrotask(() => {
+		flushScheduled = false
+		collector.flush()
+	})
+}
+
 /**
  * Converts a style object into a unique CSS class name.
  *
@@ -75,17 +90,13 @@ export type CSSObject = CSSProperties &
  *   return <button className={button}>Click me</button>
  * }
  */
-function isServer(): boolean {
-	return typeof globalThis !== 'undefined' && (globalThis as any).window === undefined
-}
-
 export function css(styles?: CSSObject | null): string {
 	if (!styles || typeof styles !== 'object') {
 		return 'next-0'
 	}
 	const className = collector.addStyle(styles)
 	if (isServer() && process.env.NODE_ENV !== 'production') {
-		collector.flush()
+		scheduleFlush()
 	}
 	return className
 }
@@ -111,7 +122,7 @@ export function global(styles?: Record<string, CSSObject> | null): void {
 		collector.addGlobalStyle(selector, styleObj)
 	})
 	if (isServer() && process.env.NODE_ENV !== 'production') {
-		collector.flush()
+		scheduleFlush()
 	}
 }
 

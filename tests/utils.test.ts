@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test'
 import {
 	BREAKPOINTS,
+	addPxIfNeeded,
 	camelToKebab,
 	deduplicateStyles,
 	generateClassHash,
@@ -23,6 +24,17 @@ describe('utils', () => {
 
 		it('should handle ms prefix correctly', () => {
 			expect(camelToKebab('msTransition')).toBe('-ms-transition')
+		})
+	})
+
+	describe('addPxIfNeeded', () => {
+		it('should append px to dimensional properties and preserve unitless properties', () => {
+			expect(addPxIfNeeded('fontSize', 16)).toBe('16px')
+			expect(addPxIfNeeded('margin', 0)).toBe(0)
+			expect(addPxIfNeeded('--x', 10)).toBe(10)
+			expect(addPxIfNeeded('aspectRatio', 1.5)).toBe(1.5)
+			expect(addPxIfNeeded('WebkitLineClamp', 3)).toBe(3)
+			expect(addPxIfNeeded('lineClamp', 2)).toBe(2)
 		})
 	})
 

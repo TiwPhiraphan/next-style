@@ -1,83 +1,49 @@
 /**
- * Set of CSS property names (camelCase and kebab-case) that accept unitless numbers.
+ * Set of kebab-case CSS property names that accept unitless numbers.
  */
 const UNITLESS_PROPERTIES = new Set([
-	'animationIterationCount',
 	'animation-iteration-count',
-	'borderImageOutset',
+	'aspect-ratio',
 	'border-image-outset',
-	'borderImageSlice',
 	'border-image-slice',
-	'borderImageWidth',
 	'border-image-width',
-	'boxFlex',
 	'box-flex',
-	'boxFlexGroup',
 	'box-flex-group',
-	'boxOrdinalGroup',
 	'box-ordinal-group',
-	'columnCount',
 	'column-count',
 	'columns',
 	'flex',
-	'flexGrow',
 	'flex-grow',
-	'flexPositive',
 	'flex-positive',
-	'flexShrink',
 	'flex-shrink',
-	'flexNegative',
 	'flex-negative',
-	'flexOrder',
 	'flex-order',
-	'gridArea',
 	'grid-area',
-	'gridRow',
 	'grid-row',
-	'gridRowEnd',
 	'grid-row-end',
-	'gridRowSpan',
 	'grid-row-span',
-	'gridRowStart',
 	'grid-row-start',
-	'gridColumn',
 	'grid-column',
-	'gridColumnEnd',
 	'grid-column-end',
-	'gridColumnSpan',
 	'grid-column-span',
-	'gridColumnStart',
 	'grid-column-start',
-	'fontWeight',
 	'font-weight',
-	'lineClamp',
 	'line-clamp',
-	'lineHeight',
 	'line-height',
 	'opacity',
 	'order',
 	'orphans',
-	'tabSize',
 	'tab-size',
 	'widows',
-	'zIndex',
 	'z-index',
 	'zoom',
-	'fillOpacity',
 	'fill-opacity',
-	'floodOpacity',
 	'flood-opacity',
-	'stopOpacity',
 	'stop-opacity',
-	'strokeDasharray',
 	'stroke-dasharray',
-	'strokeDashoffset',
 	'stroke-dashoffset',
-	'strokeMiterlimit',
 	'stroke-miterlimit',
-	'strokeOpacity',
 	'stroke-opacity',
-	'strokeWidth',
 	'stroke-width',
 	'scale'
 ])
@@ -109,17 +75,18 @@ export function camelToKebab(str: string): string {
  * @returns Formatted value with 'px' appended if needed.
  */
 export function addPxIfNeeded(prop: string, value: any): string | number {
-	if (typeof value === 'number' && value !== 0 && !UNITLESS_PROPERTIES.has(prop)) {
-		return `${value}px`
+	if (typeof value !== 'number' || value === 0 || prop.startsWith('--')) {
+		return value
 	}
-	return value
+	const key = camelToKebab(prop).replace(/^-(webkit|moz|ms|o)-/, '')
+	return UNITLESS_PROPERTIES.has(key) ? value : `${value}px`
 }
 
 /**
  * Recursively canonicalizes an object by sorting its keys alphabetically.
  * Ensures consistent serialization regardless of property insertion order.
  */
-function canonicalizeObject(obj: any): any {
+export function canonicalizeObject(obj: any): any {
 	if (obj === null || typeof obj !== 'object') {
 		return obj
 	}
